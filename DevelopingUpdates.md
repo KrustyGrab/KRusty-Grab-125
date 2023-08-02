@@ -1,7 +1,7 @@
 
 # Ema 
 ## hot keys:
-esempio con egui / eframes 
+esempio con egui / eframes \n
 https://github.com/tauri-apps/global-hotkey/blob/dev/examples/egui.rs
 funziona ma lo prende solo se sei all'interno dell'applicazione. Potrebbe anche starci bene così 
 Se sei al di fuori dell'applicazione: 
