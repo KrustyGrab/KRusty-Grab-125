@@ -1,4 +1,4 @@
-# laughing-waffle
+# KRusty-Grab-125
 ## Multi-platform screen-grabbing utility _in Rust_
 
 The application should fulfill the following requirements:
