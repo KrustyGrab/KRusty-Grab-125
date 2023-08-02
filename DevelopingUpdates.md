@@ -1,9 +1,12 @@
 
 # Ema 
 ## hot keys:
-esempio con egui / eframes \n
+esempio con egui / eframes
+
 https://github.com/tauri-apps/global-hotkey/blob/dev/examples/egui.rs
+
 funziona ma lo prende solo se sei all'interno dell'applicazione. Potrebbe anche starci bene così 
+
 Se sei al di fuori dell'applicazione: 
 - si mangia la lettera che hai scritto 
 - quando riattivi la scheda dell'applicazione esegue la funzione voluta 
