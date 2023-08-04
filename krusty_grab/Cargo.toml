@@ -6,3 +6,21 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+egui = "0.22.0"
+eframe = { version = "0.22.0", default-features = false, features = [
+    "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
+    "default_fonts", # Embed the default egui fonts.
+    "glow",          # Use the glow rendering backend. Alternative: "wgpu".
+    "persistence",   # Enable restoring app state when restarting the app.
+] }
+global-hotkey = "0.2.3"
+keyboard-types = { version = "0.6.2" }
+converter_buddy = "0.2.1"
+
+[[bin]]
+name = "hk"
+path = "./bin/exampleHotKeys.rs"
+
+[[bin]]
+name = "imgconv"
+path = "./bin/image_converter.rs"
