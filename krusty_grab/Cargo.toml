@@ -6,3 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+confy = "0.5.1"
+eframe = "0.22.0"
+egui = "0.22.0"
+serde = {version = "1.0.181", features = ["derive"]}
+tracing = "0.1.37"
+tracing-subscriber = "0.3.17"
