@@ -1,26 +1,78 @@
-use std::str::FromStr;
+use std::{
+    ffi::OsString,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
-use egui::ColorImage;
-use screenshots::Screen;
 use anyhow::Error;
-use image::{ImageBuffer, Rgba, ImageFormat};
+use egui::ColorImage;
+use image::{ImageBuffer, ImageFormat, Rgba};
+use screenshots::Screen;
 
-pub struct Shape{
+pub struct Shape {
     start_x: usize,
     start_y: usize,
     width: usize,
-    height: usize
+    height: usize,
 }
 
-pub enum SaveFormat{
+impl Shape {
+    pub fn new(x: usize, y: usize, width: usize, height: usize) -> Self {
+        Self {
+            start_x: x,
+            start_y: y,
+            width,
+            height,
+        }
+    }
+}
+
+pub enum SaveFormat {
     Png,
     Gif,
-    Jpeg
+    Jpg,
 }
 
-impl Shape{
-    pub fn new(x: usize, y: usize, width: usize, height: usize) -> Self{
-        Self { start_x: x, start_y: y, width: width, height: height }
+pub struct SaveOptions<'a> {
+    format: SaveFormat,
+    path: Box<&'a Path>,
+    file_name: OsString,
+}
+
+impl<'a> SaveOptions<'a> {
+    pub fn new() -> Self {
+        Self {
+            format: SaveFormat::Png,
+            path: Box::new(Path::new("./")),
+            file_name: OsString::from_str("out").unwrap(),
+        }
+    }
+
+    pub fn new_with_details(format: SaveFormat, path: &'a Path, file_name: OsString) -> Self {
+        Self {
+            format,
+            path: Box::new(path),
+            file_name,
+        }
+    }
+
+    pub fn save_path(&self) -> PathBuf {
+        let mut save_path = PathBuf::new();
+        save_path.push(*self.path);
+        save_path.push(
+            self.file_name
+                .to_str()
+                .expect("Should be a convertible string"),
+        );
+
+        match self.format {
+            SaveFormat::Png => save_path.push(".png"),
+            SaveFormat::Gif => save_path.push(".gif"),
+            SaveFormat::Jpg => save_path.push(".jpg"),
+            // _ => Err("Incompatible saving format"),
+        }
+
+        save_path
     }
 }
 
@@ -28,48 +80,55 @@ pub fn take_screen(screen_src: usize) -> Result<ColorImage, Error> {
     let screen = Screen::all()?[screen_src];
 
     match screen.capture() {
-        Ok(image) => Ok(ColorImage::from_rgba_unmultiplied([image.width() as usize, image.height() as usize], image.rgba())),
+        Ok(image) => Ok(ColorImage::from_rgba_unmultiplied(
+            [image.width() as usize, image.height() as usize],
+            image.rgba(),
+        )),
         Err(e) => Err(e),
     }
 }
 
-pub fn take_crop_screen(screen_src: usize, crop: Shape) -> Result<ColorImage, Error>{
+pub fn take_crop_screen(screen_src: usize, crop: Shape) -> Result<ColorImage, Error> {
     let screen = Screen::all()?[screen_src];
 
-    match screen.capture_area(crop.start_x as i32, crop.start_y as i32, crop.width as u32, crop.height as u32){
-        Ok(image) => Ok(ColorImage::from_rgba_unmultiplied([image.width() as usize, image.height() as usize], image.rgba())),
+    match screen.capture_area(
+        crop.start_x as i32,
+        crop.start_y as i32,
+        crop.width as u32,
+        crop.height as u32,
+    ) {
+        Ok(image) => Ok(ColorImage::from_rgba_unmultiplied(
+            [image.width() as usize, image.height() as usize],
+            image.rgba(),
+        )),
         Err(e) => Err(e),
     }
 }
 
-pub fn save_image(image: ColorImage, save_format: SaveFormat) -> Result<(), Error>{
+pub fn save_image(image: ColorImage, save_options: SaveOptions) -> Result<(), Error> {
     //Formulazione temporanea per la conversione da ColorImage a Vec<u8> utilizzato per la conversione in ImageBuffer
-    let pix: Vec<u8> = image.pixels.iter().flat_map(|p| {p.to_array().iter().copied().collect::<Vec<u8>>()}).collect();
-    let im: ImageBuffer<Rgba<u8>, Vec<_>> = ImageBuffer::from_vec(image.width() as u32, 
-        image.height() as u32, 
-        pix)
-        .expect("Unable to obtain ImageBuffer from vec");
-    
-    let ext: &str;
-    let format: ImageFormat;
-    let file_name:String = String::from_str("out")?;
+    let pix: Vec<u8> = image
+        .pixels
+        .iter()
+        .flat_map(|p| p.to_array().iter().copied().collect::<Vec<u8>>())
+        .collect();
 
-    match save_format{
-        SaveFormat::Png => {
-            ext = ".png";
-            format = ImageFormat::Png
-        },
-        SaveFormat::Gif => {
-            ext = ".gif";
-            format = ImageFormat::Gif
-        },
-        SaveFormat::Jpeg => {
-            ext = ".jpeg";
-            format = ImageFormat::Jpeg
-        },
+    let im: ImageBuffer<Rgba<u8>, Vec<_>> =
+        ImageBuffer::from_vec(image.width() as u32, image.height() as u32, pix)
+            .expect("Unable to obtain ImageBuffer from vec");
+
+    let save_path = save_options.save_path();
+    let format: ImageFormat;
+
+    match save_options.format {
+        SaveFormat::Png => format = ImageFormat::Png,
+        SaveFormat::Gif => format = ImageFormat::Gif,
+        SaveFormat::Jpg => format = ImageFormat::Jpeg,
         // _ => Err("Incompatible saving format"),
     }
-    im.save_with_format(file_name + ext, format).expect("Unable to save the image");
+
+    im.save_with_format(save_path, format)
+        .expect("Unable to save the image");
 
     Ok(())
 }
