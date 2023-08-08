@@ -33,6 +33,16 @@ pub enum SaveFormat {
     Jpg,
 }
 
+impl ToString for SaveFormat {
+    fn to_string(&self) -> String {
+        match self {
+            SaveFormat::Png => String::from(".png"),
+            SaveFormat::Gif => String::from(".gif"),
+            SaveFormat::Jpg => String::from(".jpg"),
+        }
+    }
+}
+
 pub struct SaveOptions<'a> {
     format: SaveFormat,
     path: Box<&'a Path>,
@@ -56,21 +66,35 @@ impl<'a> SaveOptions<'a> {
         }
     }
 
+    pub fn change_format(&mut self, format: SaveFormat) -> Option<()>{
+        self.format = format;
+        Some(())
+    }
+
+    pub fn change_path(&mut self, path: &'a Path) -> Option<()>{
+        self.path = Box::new(path);
+        Some(())
+    }
+
+    pub fn change_file_name(&mut self, file_name: OsString) -> Option<()>{
+        self.file_name = file_name;
+        Some(())
+    }
+
+    pub fn save_file_name(&self) -> OsString {
+        let mut file_name: OsString = self.file_name.clone();
+        file_name.push(self.format.to_string());
+
+        file_name
+    }
+
     pub fn save_path(&self) -> PathBuf {
-        let mut save_path = PathBuf::new();
-        save_path.push(*self.path);
+        let mut save_path = PathBuf::from(*self.path);
         save_path.push(
-            self.file_name
+                self.save_file_name()
                 .to_str()
                 .expect("Should be a convertible string"),
         );
-
-        match self.format {
-            SaveFormat::Png => save_path.push(".png"),
-            SaveFormat::Gif => save_path.push(".gif"),
-            SaveFormat::Jpg => save_path.push(".jpg"),
-            // _ => Err("Incompatible saving format"),
-        }
 
         save_path
     }
