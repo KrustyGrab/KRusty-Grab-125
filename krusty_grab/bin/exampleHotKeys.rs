@@ -5,11 +5,14 @@ use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager};
 use keyboard_types::{Code, Modifiers};
 
 fn main() -> Result<(), eframe::Error> {
+
+    //HOT KEYS 
     let manager = GlobalHotKeyManager::new().unwrap();
     let hotkey = HotKey::new(Some(Modifiers::SHIFT), Code::KeyD);
 
     manager.register(hotkey).unwrap();
-
+    //FINE HOT KEYS -> vedi update 
+    
     let options = eframe::NativeOptions {
         initial_window_size: Some(egui::vec2(320.0, 240.0)),
         ..Default::default()
@@ -38,9 +41,12 @@ impl Default for MyApp {
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+
+        //HOT KEYS
         if let Ok(event) = GlobalHotKeyEvent::receiver().try_recv() {
             println!("tray event: {event:?}");
         }
+        //FINE HOT KEYS 
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("My egui Application");
