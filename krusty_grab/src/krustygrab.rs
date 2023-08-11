@@ -1,5 +1,7 @@
 use eframe::{App, CreationContext};
-use egui::{CentralPanel, TopBottomPanel, Ui, Context, Label, Hyperlink, TextStyle, menu, Layout, Button, FontId, RichText, Visuals, Window, Grid};
+use egui::{CentralPanel, TopBottomPanel, Ui, Context, Label, Hyperlink, TextStyle, menu, Layout, Button, FontId, RichText, Visuals, Window, Grid, ColorImage, Pos2, Stroke, Color32, Frame, Rect, emath, Sense};
+use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager};
+use keyboard_types::{Code, Modifiers};
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -10,16 +12,80 @@ enum Format {
     Gif,
 } 
 
+// #[derive(Serialize, Deserialize)]
+// struct HotKeys {
+//     manager: GlobalHotKeyManager,
+//     screen: HotKey,
+// }
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(default))]
+pub struct Painting {
+    /// in 0-1 normalized coordinates
+    lines: Vec<Vec<Pos2>>,
+    stroke: Stroke,
+}
+
+impl Painting {
+    pub fn ui_paint(&mut self, ui: &mut Ui) -> egui::Response {
+        let (mut response, painter) =
+            ui.allocate_painter(ui.available_size_before_wrap(), Sense::drag());
+
+        let to_screen = emath::RectTransform::from_to(
+            Rect::from_min_size(Pos2::ZERO, response.rect.square_proportions()),
+            response.rect,
+        );
+        let from_screen = to_screen.inverse();
+
+        if self.lines.is_empty() {
+            self.lines.push(vec![]);
+        }
+
+        let current_line = self.lines.last_mut().unwrap();
+
+        if let Some(pointer_pos) = response.interact_pointer_pos() {
+            let canvas_pos = from_screen * pointer_pos;
+            if current_line.last() != Some(&canvas_pos) {
+                current_line.push(canvas_pos);
+                response.mark_changed();
+            }
+        } else if !current_line.is_empty() {
+            self.lines.push(vec![]);
+            response.mark_changed();
+        }
+
+        let shapes = self
+            .lines
+            .iter()
+            .filter(|line| line.len() >= 2)
+            .map(|line| {
+                let points: Vec<Pos2> = line.iter().map(|p| to_screen * *p).collect();
+                egui::Shape::line(points, self.stroke)
+            });
+
+        painter.extend(shapes);
+
+        response
+    }
+}
+
+impl Default for Painting {
+    fn default() -> Self {
+        Self { lines: Default::default(), stroke: Stroke::new(1.0, Color32::from_rgb(25, 200, 100)) }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct KrustyGrabConfig {
     dark_mode: bool,  
     save_folder: String, 
     save_format: Format, 
+    // hotkeys: HotKeys,
 }
 
 impl Default for KrustyGrabConfig {
     fn default() -> Self {
-        Self { dark_mode: true, save_folder: String::new(), save_format: Format::Png}
+        Self { dark_mode: true, save_folder: String::new(), save_format: Format::Png }
     }
 }
 
@@ -32,6 +98,8 @@ impl KrustyGrabConfig {
 pub struct KrustyGrab {
     config: KrustyGrabConfig,
     config_window: bool,
+    screen: Option<ColorImage>,
+    paint: Painting,
 }
 
 impl KrustyGrab {
@@ -55,7 +123,7 @@ impl KrustyGrab {
 
         let config: KrustyGrabConfig = confy::load("krustygrab", None).unwrap_or_default();
 
-        Self {config, config_window: false}
+        Self { config, config_window: false, screen: None, paint: Painting::default() }
     }
 
     fn render_top_panel(&mut self, ctx: &Context) {
@@ -63,11 +131,6 @@ impl KrustyGrab {
         TopBottomPanel::top("top panel").show(ctx, |ui| {
             ui.add_space(3.);
             menu::bar(ui, |ui| {
-                // //logo
-                // ui.with_layout(Layout::left_to_right(egui::Align::Min), |ui| {
-                //     ui.label(RichText::new("📷").text_style(TextStyle::Button));
-                // });
-
                 ui.menu_button("⚙️", |ui| {
                     if ui.button(RichText::new("📁 Open").text_style(TextStyle::Body)).clicked() {
                         
@@ -106,46 +169,79 @@ impl KrustyGrab {
                         self.config_window = true;
                         ui.close_menu();
                     }
-
-                    // ui.menu_button("SubMenu", |ui| {
-                    //     ui.menu_button("SubMenu", |ui| {
-                    //         if ui.button("Open...").clicked() {
-                    //             ui.close_menu();
-                    //         }
-                    //         let _ = ui.button("Item");
-                    //     });
-                    //     ui.menu_button("SubMenu", |ui| {
-                    //         if ui.button("Open...").clicked() {
-                    //             ui.close_menu();
-                    //         }
-                    //         let _ = ui.button("Item");
-                    //     });
-                    //     let _ = ui.button("Item");
-                    //     if ui.button("Open...").clicked() {
-                    //         ui.close_menu();
-                    //     }
-                    // });
                 });
 
-                //controls
-                // ui.with_layout(Layout::right_to_left(egui::Align::Max), |ui| {
-                //     //let close_bnt = ui.add(Button::new("❌"));
-                //     let theme_bnt = ui.button("🌙");
+                //painting commands
+                if self.screen.is_some() {
+                    tracing::error!("Painting buttons");
+                    
+                    ui.horizontal(|ui| {
+                        ui.style_mut().override_text_style = Some(TextStyle::Body);
 
-                //     if theme_bnt.clicked() {
-                //         self.config.dark_mode = !self.config.dark_mode;
-                //     }
-                // });
+                        egui::stroke_ui(ui, &mut self.paint.stroke, "Stroke");
+                        ui.separator();
+                        if ui.button("Clear Painting").clicked() {
+                            self.paint.lines.clear();
+                        }
+                    });
+                }
+
+                //controls
+                ui.with_layout(Layout::right_to_left(egui::Align::Max), |ui| {
+                    //let close_bnt = ui.add(Button::new("❌"));
+                    let screen_bnt = ui.button("📷");
+
+                    if screen_bnt.clicked() {
+                        tracing::error!("Screen button clicked");
+                        self.screen = Some(ColorImage::example());
+                    }
+                });
             });
             ui.add_space(3.);
         });
-        //add a menù bar
-        //2 layout widgets
-        //to render the logo on the left
-        //control buttons on the right
-        //padding before and after the panel
     }   
 
+    fn render_central_panel(&mut self, ctx: &Context){
+        CentralPanel::default().show(ctx, |ui| {
+
+            if let Some(screen) = &self.screen {
+                let texture: egui::TextureHandle = ui.ctx().load_texture(
+                    "my-screen",
+                    screen.clone(),
+                    Default::default()
+                );
+                
+                // Show the image:    
+                ui.image(&texture, ui.available_size());
+
+                //self.paint.ui_paint(ui);
+
+                Frame::canvas(ui.style())
+                    .fill(Color32::from_black_alpha(0))
+                    .show(ui, |ui| {
+                    self.paint.ui_paint(ui);
+                });
+            }
+
+            self.render_footer(ctx);
+        });        
+    }
+
+    fn render_footer(&self, ctx: &Context) {
+        TopBottomPanel::bottom("footer").show(ctx, |ui| {
+            ui.vertical_centered(|ui| {
+                ui.add_space(10.);
+                
+                ui.hyperlink_to(
+                    RichText::new("KRusty-Grab-125 on GitHub").text_style(TextStyle::Small),
+                    "https://github.com/Emanueleff/KRusty-Grab-125",
+                );
+    
+                ui.add_space(10.);
+            }); 
+        });
+    }
+    
     fn render_config(&mut self, ctx: &Context) {
         Window::new(RichText::new("Configuration").text_style(TextStyle::Body)).show(ctx, |ui| {
             
@@ -230,29 +326,6 @@ impl App for KrustyGrab {
         }
         
         self.render_top_panel(ctx);
-        CentralPanel::default().show(ctx, |ui| {
-            ui.label("testo");
-
-            render_footer(ctx);
-        });
-    }
-
-
-   
+        self.render_central_panel(ctx);
+    }  
 }
-
-fn render_footer(ctx: &Context) {
-    TopBottomPanel::bottom("footer").show(ctx, |ui| {
-        ui.vertical_centered(|ui| {
-            ui.add_space(10.);
-            
-            ui.hyperlink_to(
-                RichText::new("KRusty-Grab-125 on GitHub").text_style(TextStyle::Small),
-                "https://github.com/Emanueleff/KRusty-Grab-125",
-            );
-
-            ui.add_space(10.);
-        }); 
-    });
-}
-
