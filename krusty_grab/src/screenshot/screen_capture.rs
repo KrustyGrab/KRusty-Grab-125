@@ -1,12 +1,15 @@
+#![allow(unused)]
 use std::{
     ffi::OsString,
+    fs::File,
     path::{Path, PathBuf},
     str::FromStr,
+    time::Instant,
 };
 
 use anyhow::Error;
 use egui::ColorImage;
-use image::{ImageBuffer, ImageFormat, Rgba};
+use image::{ImageBuffer, ImageEncoder, ImageFormat, Rgba};
 use screenshots::Screen;
 
 pub struct Shape {
@@ -66,17 +69,17 @@ impl<'a> SaveOptions<'a> {
         }
     }
 
-    pub fn change_format(&mut self, format: SaveFormat) -> Option<()>{
+    pub fn change_format(&mut self, format: SaveFormat) -> Option<()> {
         self.format = format;
         Some(())
     }
 
-    pub fn change_path(&mut self, path: &'a Path) -> Option<()>{
+    pub fn change_path(&mut self, path: &'a Path) -> Option<()> {
         self.path = Box::new(path);
         Some(())
     }
 
-    pub fn change_file_name(&mut self, file_name: OsString) -> Option<()>{
+    pub fn change_file_name(&mut self, file_name: OsString) -> Option<()> {
         self.file_name = file_name;
         Some(())
     }
@@ -91,7 +94,7 @@ impl<'a> SaveOptions<'a> {
     pub fn save_path(&self) -> PathBuf {
         let mut save_path = PathBuf::from(*self.path);
         save_path.push(
-                self.save_file_name()
+            self.save_file_name()
                 .to_str()
                 .expect("Should be a convertible string"),
         );
@@ -144,15 +147,38 @@ pub fn save_image(image: ColorImage, save_options: SaveOptions) -> Result<(), Er
     let save_path = save_options.save_path();
     let format: ImageFormat;
 
+    let t = Instant::now();
+
     match save_options.format {
-        SaveFormat::Png => format = ImageFormat::Png,
-        SaveFormat::Gif => format = ImageFormat::Gif,
-        SaveFormat::Jpg => format = ImageFormat::Jpeg,
-        // _ => Err("Incompatible saving format"),
+        SaveFormat::Png => {
+            im.save_with_format(save_path, ImageFormat::Png)
+                .expect("Unable to save the image");
+
+            println!("Inside {:?}", t.elapsed());
+
+            return Ok(());
+        }
+        SaveFormat::Jpg => {
+            im.save_with_format(save_path, ImageFormat::Jpeg)
+                .expect("Unable to save the image");
+
+            println!("Inside {:?}", t.elapsed());
+
+            return Ok(());
+        }
+        SaveFormat::Gif => {
+            let buffer = File::create(save_path).expect("Unable to create image file");
+            let mut gif_encoder = image::codecs::gif::GifEncoder::new_with_speed(buffer, 30);
+
+            let frame = image::Frame::new(im);
+            gif_encoder
+                .encode_frame(frame)
+                .expect("Unable to encode gif frame");
+
+            println!("Inside {:?}", t.elapsed());
+
+            return Ok(());
+        }
+        _ => return Err(Error::msg("Incompatible image format selected")),
     }
-
-    im.save_with_format(save_path, format)
-        .expect("Unable to save the image");
-
-    Ok(())
 }
