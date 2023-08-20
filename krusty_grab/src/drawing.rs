@@ -1,4 +1,4 @@
-use egui::{Context, Pos2, Stroke, Rect, Vec2, Rgba, Color32, Layout, Align, Button, Id, color_picker::{color_edit_button_rgba, Alpha}, DragValue, Ui, LayerId, Order, pos2, Align2, FontId, Widget};
+use egui::{Context, Pos2, Stroke, Rect, Vec2, Rgba, Color32, Layout, Align, Button, Id, color_picker::{color_edit_button_rgba, Alpha}, DragValue, Ui, LayerId, Order, pos2, Align2, FontId, Widget, Window};
 use egui_extras::RetainedImage;
 use serde::{Serialize, Deserialize};
 use crate::krustygrab::{self, KrustyGrab, };
@@ -128,7 +128,19 @@ impl KrustyGrab {
             None => Vec::<DrawingType>::new(),
         };
 
-        for d in drawings {
+        let mut color = match ctx.memory(|mem| mem.data.get_temp::<Rgba>(Id::from("Color"))){
+            Some(c) => c,
+            None => Rgba::from(Color32::GREEN)
+        };
+
+        let mut thickness = match ctx.memory(|mem| mem.data.get_temp::<f32>(Id::from("Thickness"))){
+            Some(t) => t,
+            None => 1.0
+        };
+
+        let mut stroke = Stroke::new(thickness, color);
+
+        for d in &drawings {
             match d.clone() {
                 DrawingType::Brush { points, s, end } => {
                     for i in 1..points.len() {
@@ -155,8 +167,13 @@ impl KrustyGrab {
             None => false
         };
 
+        let drawing_mode = match ctx.memory_mut(|mem| mem.data.get_temp(Id::from("DrawingMode"))) {
+            Some(m) => m,
+            None => DrawingMode::Brush,    
+        };
+
         match ctx.input(|i| i.pointer.hover_pos()) {
-            Some(mut mouse) => {
+            Some(mouse) => {
                 let hover_rect = match ctx.memory(|mem| mem.data.get_temp(Id::from("hover_rect"))){
                     Some(r) => r,
                     None => area,
@@ -164,6 +181,39 @@ impl KrustyGrab {
 
                 if hover_rect.contains(mouse) && !color_picker_open {
                     
+                    let mut text: String = Default::default();
+                    let te_window = match ctx.memory_mut(|mem| mem.data.get_temp(Id::from("TE_open"))) {
+                        Some(te) => te,
+                        None => false,
+                    };
+                    let te_pos = match ctx.memory_mut(|mem| mem.data.get_temp(Id::from("TE_pos"))) {
+                        Some(pos) => pos,
+                        None => Pos2::ZERO,
+                    };
+
+                    if te_window {
+                        Window::new("")
+                        .fixed_pos(te_pos)
+                        .show(ctx, |ui| {
+                            if ui.text_edit_singleline(&mut text).lost_focus() {
+                                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("TE_open"), false));
+                            };
+                        });
+                    } 
+
+                    if ctx.input(|i| i.pointer.primary_clicked()) {
+                        match drawing_mode {
+                            DrawingMode::Text => {
+                                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("TE_open"), true));
+                                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("TE_pos"), mouse));
+                                
+                                drawings.push(DrawingType::Text { p: mouse, t: text, s: stroke });
+                                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Drawing"), drawings.clone()));
+                            },
+                            _ => {},
+                        }
+                    }
+
                 }
             },
             None => {},
