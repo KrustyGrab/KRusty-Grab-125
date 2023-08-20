@@ -9,6 +9,7 @@ edition = "2021"
 confy = "0.5.1"
 eframe = "0.22.0"
 egui = "0.22.0"
+egui_extras = {version="0.22.0", features = ["svg", "image"] }
 global-hotkey = "0.2.3"
 keyboard-types = "0.6.2"
 serde = {version = "1.0.181", features = ["derive"]}

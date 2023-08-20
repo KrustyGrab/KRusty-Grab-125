@@ -1,7 +1,9 @@
 mod krustygrab;
+mod drawing;
+mod icons;
 
 use eframe::{run_native, NativeOptions};
-use egui::{Vec2, Context};
+use egui::Vec2;
 use krustygrab::KrustyGrab;
 
 fn main() {

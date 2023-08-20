@@ -1,11 +1,12 @@
-use eframe::{App, CreationContext};
-use egui::{CentralPanel, TopBottomPanel, Ui, Context, Label, Hyperlink, TextStyle, menu, Layout, Button, FontId, RichText, Visuals, Window, Grid, ColorImage, Pos2, Stroke, Color32, Frame, Rect, emath, Sense};
+use eframe::{App, CreationContext, egui_glow::painter};
+use egui::{CentralPanel, TopBottomPanel, Ui, Context, Label, Hyperlink, TextStyle, menu, Layout, Button, FontId, RichText, Visuals, Window, Grid, ColorImage, Pos2, Stroke, Color32, Frame, Rect, emath, Sense, Id, TextBuffer, Align, Widget, Vec2, TextureId, LayerId, Order, pos2, DragValue, Rgba, color_picker::{Alpha, color_edit_button_rgba}, Align2};
+use egui_extras::RetainedImage;
 use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager};
 use keyboard_types::{Code, Modifiers};
 use serde::{Serialize, Deserialize};
+use crate::icons::{icon_img, ICON_SIZE};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-
 enum Format {
     Jpeg,
     Png,
@@ -17,63 +18,6 @@ enum Format {
 //     manager: GlobalHotKeyManager,
 //     screen: HotKey,
 // }
-
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[cfg_attr(feature = "serde", serde(default))]
-pub struct Painting {
-    /// in 0-1 normalized coordinates
-    lines: Vec<Vec<Pos2>>,
-    stroke: Stroke,
-}
-
-impl Painting {
-    pub fn ui_paint(&mut self, ui: &mut Ui) -> egui::Response {
-        let (mut response, painter) =
-            ui.allocate_painter(ui.available_size_before_wrap(), Sense::drag());
-
-        let to_screen = emath::RectTransform::from_to(
-            Rect::from_min_size(Pos2::ZERO, response.rect.square_proportions()),
-            response.rect,
-        );
-        let from_screen = to_screen.inverse();
-
-        if self.lines.is_empty() {
-            self.lines.push(vec![]);
-        }
-
-        let current_line = self.lines.last_mut().unwrap();
-
-        if let Some(pointer_pos) = response.interact_pointer_pos() {
-            let canvas_pos = from_screen * pointer_pos;
-            if current_line.last() != Some(&canvas_pos) {
-                current_line.push(canvas_pos);
-                response.mark_changed();
-            }
-        } else if !current_line.is_empty() {
-            self.lines.push(vec![]);
-            response.mark_changed();
-        }
-
-        let shapes = self
-            .lines
-            .iter()
-            .filter(|line| line.len() >= 2)
-            .map(|line| {
-                let points: Vec<Pos2> = line.iter().map(|p| to_screen * *p).collect();
-                egui::Shape::line(points, self.stroke)
-            });
-
-        painter.extend(shapes);
-
-        response
-    }
-}
-
-impl Default for Painting {
-    fn default() -> Self {
-        Self { lines: Default::default(), stroke: Stroke::new(1.0, Color32::from_rgb(25, 200, 100)) }
-    }
-}
 
 #[derive(Serialize, Deserialize)]
 struct KrustyGrabConfig {
@@ -98,8 +42,8 @@ impl KrustyGrabConfig {
 pub struct KrustyGrab {
     config: KrustyGrabConfig,
     config_window: bool,
-    screen: Option<ColorImage>,
-    paint: Painting,
+    pub screen: Option<ColorImage>,
+    // paint: Painting,
 }
 
 impl KrustyGrab {
@@ -123,7 +67,7 @@ impl KrustyGrab {
 
         let config: KrustyGrabConfig = confy::load("krustygrab", None).unwrap_or_default();
 
-        Self { config, config_window: false, screen: None, paint: Painting::default() }
+        Self { config, config_window: false, screen: None }
     }
 
     fn render_top_panel(&mut self, ctx: &Context) {
@@ -131,7 +75,7 @@ impl KrustyGrab {
         TopBottomPanel::top("top panel").show(ctx, |ui| {
             ui.add_space(3.);
             menu::bar(ui, |ui| {
-                ui.menu_button("⚙️", |ui| {
+                ui.menu_image_button(icon_img("gear", ctx), ICON_SIZE, |ui| {
                     if ui.button(RichText::new("📁 Open").text_style(TextStyle::Body)).clicked() {
                         
                     }
@@ -175,23 +119,12 @@ impl KrustyGrab {
                 if self.screen.is_some() {
                     tracing::error!("Painting buttons");
                     
-                    ui.horizontal(|ui| {
-                        ui.style_mut().override_text_style = Some(TextStyle::Body);
-
-                        egui::stroke_ui(ui, &mut self.paint.stroke, "Stroke");
-                        ui.separator();
-                        if ui.button("Clear Painting").clicked() {
-                            self.paint.lines.clear();
-                        }
-                    });
+                    self.render_drawing_toolbar(ctx, ui);
                 }
 
                 //controls
                 ui.with_layout(Layout::right_to_left(egui::Align::Max), |ui| {
-                    //let close_bnt = ui.add(Button::new("❌"));
-                    let screen_bnt = ui.button("📷");
-
-                    if screen_bnt.clicked() {
+                    if Button::image_and_text(icon_img("camera", ctx), ICON_SIZE, "").ui(ui).clicked() {
                         tracing::error!("Screen button clicked");
                         self.screen = Some(ColorImage::example());
                     }
@@ -212,22 +145,16 @@ impl KrustyGrab {
                 );
                 
                 // Show the image:    
-                ui.image(&texture, ui.available_size());
+                // ui.image(&texture, ui.available_size());
 
-                //self.paint.ui_paint(ui);
-
-                Frame::canvas(ui.style())
-                    .fill(Color32::from_black_alpha(0))
-                    .show(ui, |ui| {
-                    self.paint.ui_paint(ui);
-                });
+                self.render_drawing(ctx, ui);
             }
 
-            self.render_footer(ctx);
+            self.render_bottom_panel(ctx);
         });        
     }
 
-    fn render_footer(&self, ctx: &Context) {
+    fn render_bottom_panel(&self, ctx: &Context) {
         TopBottomPanel::bottom("footer").show(ctx, |ui| {
             ui.vertical_centered(|ui| {
                 ui.add_space(10.);
@@ -251,6 +178,9 @@ impl KrustyGrab {
                 .striped(true)
                 .show(ui, |ui| {
                     ui.label("Save folder:");
+                    // let prev_save = self.config.save_folder.clone();
+                    // let mut new_save = String::new();
+                    // ui.add(egui::TextEdit::singleline(&mut new_save).hint_text(prev_save));
                     ui.text_edit_singleline(&mut self.config.save_folder);
                     ui.end_row();
         
@@ -284,7 +214,10 @@ impl KrustyGrab {
                     ui.separator();
                     // ui.horizontal(|ui| {
                         ui.with_layout(Layout::right_to_left(egui::Align::Min), |ui| {
-                            if ui.button(RichText::new("Apply").text_style(TextStyle::Body)).clicked() {
+                            if ui.button(RichText::new("Close").text_style(TextStyle::Body)).clicked() {
+                                self.config_window = false;
+                            }
+                            else if ui.button(RichText::new("Apply").text_style(TextStyle::Body)).clicked() {
                                 if let Err(e) = confy::store("krustygrab", None, KrustyGrabConfig {
                                     dark_mode: self.config.dark_mode,
                                     save_folder: self.config.save_folder.to_string(),
@@ -307,8 +240,7 @@ impl KrustyGrab {
             
             
         });
-    } 
-
+    }   
 }
 
 impl App for KrustyGrab {
