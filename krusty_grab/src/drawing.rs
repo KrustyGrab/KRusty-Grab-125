@@ -41,6 +41,7 @@ impl KrustyGrab {
                 Color32::from_rgb(128, 106, 0)))
                 .ui(ui).clicked() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Brush));
+                tracing::error!("Pencil selected");
             }
 
             if Button::image_and_text(icon_img("circle", ctx), ICON_SIZE, "")
@@ -48,6 +49,7 @@ impl KrustyGrab {
                 Color32::from_rgb(128, 106, 0)))
                 .ui(ui).clicked() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Circle));
+                tracing::error!("Circle selected");
             }
 
             if Button::image_and_text(icon_img("rect", ctx), ICON_SIZE, "")
@@ -55,6 +57,7 @@ impl KrustyGrab {
                 Color32::from_rgb(128, 106, 0)))
                 .ui(ui).clicked() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Rectangle));
+                tracing::error!("Rect selected");
             }
 
             if Button::image_and_text(icon_img("arrow", ctx), ICON_SIZE, "")
@@ -62,6 +65,7 @@ impl KrustyGrab {
                 Color32::from_rgb(128, 106, 0)))
                 .ui(ui).clicked() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Arrow));
+                tracing::error!("Arrow selected");
             }
 
             if Button::image_and_text(icon_img("text", ctx), ICON_SIZE, "")
@@ -69,6 +73,7 @@ impl KrustyGrab {
                 Color32::from_rgb(128, 106, 0)))
                 .ui(ui).clicked() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Text));
+                tracing::error!("Text selected");
             }
 
             let color_picker = color_edit_button_rgba(ui, &mut color, Alpha::BlendOrAdditive);
@@ -81,6 +86,7 @@ impl KrustyGrab {
             }
             if color_picker.changed() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Color"), color));
+                tracing::error!("Color changed to {:?}", color);
             }
 
             ui.label("Thickness");
@@ -90,6 +96,7 @@ impl KrustyGrab {
                 .ui(ui)
                 .changed() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Thickness"), thickness));
+                tracing::error!("Thickness changed to {:?}", thickness);
             }
         });
     }
@@ -132,11 +139,13 @@ impl KrustyGrab {
             Some(c) => c,
             None => Rgba::from(Color32::GREEN)
         };
+        tracing::error!("Color from memory: {:?}", color);
 
         let mut thickness = match ctx.memory(|mem| mem.data.get_temp::<f32>(Id::from("Thickness"))){
             Some(t) => t,
             None => 1.0
         };
+        tracing::error!("Thickness from memory: {}", thickness);
 
         let mut stroke = Stroke::new(thickness, color);
 
@@ -173,7 +182,7 @@ impl KrustyGrab {
         };
 
         match ctx.input(|i| i.pointer.hover_pos()) {
-            Some(mouse) => {
+            Some(mut mouse) => {
                 let hover_rect = match ctx.memory(|mem| mem.data.get_temp(Id::from("hover_rect"))){
                     Some(r) => r,
                     None => area,
@@ -181,6 +190,7 @@ impl KrustyGrab {
 
                 if hover_rect.contains(mouse) && !color_picker_open {
                     
+                    //TEXT
                     let mut text: String = Default::default();
                     let te_window = match ctx.memory_mut(|mem| mem.data.get_temp(Id::from("TE_open"))) {
                         Some(te) => te,
@@ -202,6 +212,7 @@ impl KrustyGrab {
                     } 
 
                     if ctx.input(|i| i.pointer.primary_clicked()) {
+                        tracing::error!("Pointer primary clicked");
                         match drawing_mode {
                             DrawingMode::Text => {
                                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("TE_open"), true));
@@ -214,6 +225,154 @@ impl KrustyGrab {
                         }
                     }
 
+                    if ctx.input(|i| i.pointer.primary_down()) {
+                        tracing::error!("Pointer primary down");
+                        let mut p0 = match ctx.memory(|mem| mem.data.get_temp(Id::from("initial_pos"))) {
+                            Some(p) => p,
+                            None => {
+                                let starting_pos = ctx.input(|i| i.pointer.press_origin()).unwrap();
+                                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("initial_pos"), starting_pos));
+                                starting_pos
+                            }
+                        };
+
+
+                        match drawing_mode {
+                            DrawingMode::Brush => {
+                                let prev = match ctx.memory(|mem| mem.data.get_temp::<Pos2>(Id::from("previous_pos"))) {
+                                    Some(p) => p,
+                                    None => p0,
+                                };
+
+                                match drawings.last() {
+                                    Some(d) => {
+                                        match d.clone() {
+                                            DrawingType::Brush { points, s, end } => {
+                                                if !end {
+                                                    let mut ps = points.clone();
+                                                    drawings.pop();
+                                                    ps.push(mouse);
+                                                    drawings.push(DrawingType::Brush { points: ps, s: stroke, end: false });
+                                                }
+                                                else {
+                                                    let mut ps = Vec::new();
+                                                    ps.push(prev);
+                                                    ps.push(mouse);
+                                                    drawings.push(DrawingType::Brush { points: ps, s: stroke, end: false });
+                                                }
+                                            },
+                                            _ => {
+                                                let mut ps = Vec::new();
+                                                ps.push(prev);
+                                                ps.push(mouse);
+                                                drawings.push(DrawingType::Brush { points: ps, s: stroke, end: false });
+                                            },
+                                        }
+                                    },
+                                    None => {
+                                        let mut ps = Vec::new();
+                                        ps.push(prev);
+                                        ps.push(mouse);
+                                        drawings.push(DrawingType::Brush { points: ps, s: stroke, end: false });
+                                    },
+                                };
+                                ctx.memory_mut(|mem| {
+                                    mem.data.insert_temp(Id::from("previous_pos"), mouse);
+                                    mem.data.insert_temp(Id::from("Drawing"), drawings.clone());
+                                });
+                            },
+                            DrawingMode::Rectangle => {
+                                if mouse.x < p0.x {
+                                    (mouse.x, p0.x) = (p0.x, mouse.x);
+                                }
+                                if mouse.y < p0.y {
+                                    (mouse.y, p0.y) = (p0.y, mouse.y);
+                                }
+
+                                painter.rect_stroke(Rect::from_min_max(p0, mouse), 0.0, stroke);
+                                tracing::error!("Painted rect with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
+                            },
+                            DrawingMode::Circle => {
+                                if mouse.x < p0.x {
+                                    (mouse.x, p0.x) = (p0.x, mouse.x);
+                                }
+                                if mouse.y < p0.y {
+                                    (mouse.y, p0.y) = (p0.y, mouse.y);
+                                }
+
+                                let radius = mouse.x - p0.x;
+                                let center = pos2(p0.x + (mouse.x - p0.x) / 2.0, p0.y + (mouse.y - p0.y) / 2.0);
+
+                                painter.circle_stroke(center, radius, stroke);
+                                tracing::error!("Painted circle with center {:?}, radius {:?}, stroke {:?}", center, radius, stroke);
+                            },
+                            DrawingMode::Arrow => {
+                                painter.arrow(p0, Vec2::new(mouse.x - p0.x, mouse.y - p0.y), stroke);
+                                tracing::error!("Painted arrow with origin {:?}, vector {:?}, stroke {:?}", p0, Vec2::new(mouse.x - p0.x, mouse.y - p0.y), stroke);
+                            },
+                            _ => {},
+                        }
+                        ctx.memory_mut(|mem| {
+                            mem.data.insert_temp(Id::from("mouse_pos"), mouse);
+                            mem.data.insert_temp(Id::from("hover_rect"), area);
+                        });
+                    }
+
+                    if ctx.input(|i| i.pointer.primary_released()) {
+                        tracing::error!("Pointer primary released");
+                        let mut p0 = match ctx.memory(|mem| mem.data.get_temp(Id::from("initial_pos"))) {
+                            Some(p0) => p0,
+                            None => pos2(0.0, 0.0),
+                        };
+
+                        match drawing_mode {
+                            DrawingMode::Brush => {
+                                match drawings.last_mut().unwrap() {
+                                    DrawingType::Brush { points, s, end } => {
+                                        points.push(mouse);
+                                        *end = true;
+                                    },
+                                    _ => {},
+                                }
+                                ctx.memory_mut(|mem| mem.data.remove::<Pos2>(Id::from("previous_pos")));
+                            },
+                            DrawingMode::Rectangle => {
+                                if mouse.x < p0.x {
+                                    (mouse.x, p0.x) = (p0.x, mouse.x);
+                                }
+                                if mouse.y < p0.y {
+                                    (mouse.y, p0.y) = (p0.y, mouse.y);
+                                }
+
+                                drawings.push(DrawingType::Rectangle { r: Rect::from_min_max(p0, mouse), s: stroke });
+                                tracing::error!("Added rect with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
+                            },
+                            DrawingMode::Circle => {
+                                if mouse.x < p0.x {
+                                    (mouse.x, p0.x) = (p0.x, mouse.x);
+                                }
+                                if mouse.y < p0.y {
+                                    (mouse.y, p0.y) = (p0.y, mouse.y);
+                                }
+
+                                let radius = mouse.x - p0.x;
+                                let center = pos2(p0.x + (mouse.x - p0.x) / 2.0, p0.y + (mouse.y - p0.y) / 2.0);
+                                drawings.push(DrawingType::Circle { c: center, r: radius, s: stroke });
+                                tracing::error!("Added circle with center {:?}, radius {:?}, stroke {:?}", center, radius, stroke);
+                            },
+                            DrawingMode::Arrow => {
+                                drawings.push(DrawingType::Arrow { p: p0, v: Vec2::new(mouse.x - p0.x, mouse.y - p0.y), s: stroke });
+                                tracing::error!("Added arrow with origin {:?}, vector {:?}, stroke {:?}", p0, Vec2::new(mouse.x - p0.x, mouse.y - p0.y), stroke);
+                            },
+                            _ => {},
+                        }
+
+                        ctx.memory_mut(|mem| {
+                            mem.data.insert_temp(Id::from("Drawing"), drawings.clone());
+                            mem.data.remove::<Pos2>(Id::from("initial_pos"));
+                            mem.data.remove::<Rect>(Id::from("hover_rect"));
+                        });
+                    }
                 }
             },
             None => {},
