@@ -117,7 +117,7 @@ impl KrustyGrab {
 
                 //painting commands
                 if self.screen.is_some() {
-                    tracing::error!("Painting buttons");
+                    // tracing::error!("Painting buttons");
                     
                     self.render_drawing_toolbar(ctx, ui);
                 }
