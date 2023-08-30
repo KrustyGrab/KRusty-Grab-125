@@ -166,8 +166,7 @@ impl KrustyGrab {
                     painter.arrow(p, v, s);
                 },
                 DrawingType::Text { p , t , s} => {
-                    println!("{t:?}");
-                    painter.text(p, Align2::CENTER_CENTER, t, FontId::new(15.0, egui::FontFamily::Proportional), s.color);
+                    painter.text(p, Align2::LEFT_CENTER, t, FontId::new(15.0 + s.width, egui::FontFamily::Proportional), s.color);
                 },
             }
         }
@@ -182,6 +181,76 @@ impl KrustyGrab {
             None => DrawingMode::Brush,    
         };
 
+        if drawing_mode != DrawingMode::Text {
+            let last_was_text = match drawings.last() {
+                Some(last) => match last {
+                    DrawingType::Text { p, t, s } => true,
+                    _ => false,
+                },
+                None => false,
+            };
+            if last_was_text {
+                ctx.memory_mut(|mem| mem.data.remove::<bool>(Id::from("TE_open")));
+                ctx.memory_mut(|mem| mem.data.remove::<bool>(Id::from("TE_continue")));
+                ctx.memory_mut(|mem| mem.data.remove::<String>(Id::from("TE_text")));
+            }
+        }
+
+        //TEXT
+        let te_window = match ctx.memory_mut(|mem| mem.data.get_temp(Id::from("TE_open"))) {
+            Some(te) => te,
+            None => false,
+        };
+        
+        if te_window {
+            let mut text: String = match ctx.memory_mut(|mem| mem.data.get_temp(Id::from("TE_text"))) {
+                Some(text) => text,
+                None => Default::default(),
+            };
+            let text_pos = match ctx.memory_mut(|mem| mem.data.get_temp(Id::from("Text_pos"))) {
+                Some(pos) => pos,
+                None => Pos2::ZERO,
+            };
+            let te_continue = match ctx.memory_mut(|mem| mem.data.get_temp(Id::from("TE_continue"))) {
+                Some(c) => c,
+                None => false,
+            };
+
+            //Calcolo posizione text editor per non farlo uscire dallo schermo (valori ottenuti in modo sperimentale)
+            let mut te_pos = text_pos;
+
+            if te_pos.y + 97.0 > area.size()[1] + area.min.y {
+                te_pos = te_pos - Vec2::new(0.0, 95.0);
+            }
+            else {
+                te_pos = te_pos + Vec2::new(0.0, 20.0);
+            }
+            
+            Window::new("")
+            .fixed_pos(te_pos)
+            .show(ctx, |ui| {
+                let text_box = ui.text_edit_singleline(&mut text);
+
+                if text_box.lost_focus() {
+                    ctx.memory_mut(|mem| mem.data.remove::<bool>(Id::from("TE_open")));
+                    ctx.memory_mut(|mem| mem.data.remove::<bool>(Id::from("TE_continue")));
+                    ctx.memory_mut(|mem| mem.data.remove::<String>(Id::from("TE_text")));
+                }
+                else if text_box.changed() {
+                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("TE_text"), text.clone()));
+                    if te_continue {
+                        drawings.pop().unwrap_or(DrawingType::Text { p: text_pos, t: text.clone(), s: stroke });
+                    }
+                    else {
+                        ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("TE_continue"), true));
+                    }
+
+                    drawings.push(DrawingType::Text { p: text_pos, t: text, s: stroke });
+                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Drawing"), drawings.clone()));
+                }
+            });
+        } 
+
         match ctx.pointer_hover_pos()/* ctx.input(|i| i.pointer.hover_pos()) */ {
             Some(mut mouse) => {
                 let hover_rect = match ctx.memory(|mem| mem.data.get_temp(Id::from("hover_rect"))){
@@ -190,47 +259,13 @@ impl KrustyGrab {
                 };
 
                 if hover_rect.contains(mouse) && !color_picker_open {
-                    
-                    //TEXT
-                    let mut text: String = match ctx.memory_mut(|mem| mem.data.get_temp(Id::from("TE_text"))) {
-                        Some(text) => text,
-                        None => Default::default(),
-                    };
-                    let te_window = match ctx.memory_mut(|mem| mem.data.get_temp(Id::from("TE_open"))) {
-                        Some(te) => te,
-                        None => false,
-                    };
-                    let te_pos = match ctx.memory_mut(|mem| mem.data.get_temp(Id::from("TE_pos"))) {
-                        Some(pos) => pos,
-                        None => Pos2::ZERO,
-                    };
-
-                    if te_window {
-                        Window::new("")
-                        .fixed_pos(te_pos)
-                        .show(ctx, |ui| {
-                            let mut text_box = ui.text_edit_singleline(&mut text);
-                            if text_box.lost_focus() {
-                                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("TE_open"), false));
-                                ctx.memory_mut(|mem| mem.data.remove::<String>(Id::from("TE_text")));
-                            }
-                            // else if text_box.changed() {
-                            //     ctx.memory_mut(|mem| mem.data.insert_temp((Id::from("TE_text")), text.clone()));
-                            //     ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Drawing"), drawings.clone()));
-                            //     // println!("{:?}", drawings.last());
-                            //     drawings.push(DrawingType::Text { p: mouse, t: text, s: stroke });
-                            // }
-                        });
-                    } 
-
                     if ctx.input(|i| i.pointer.primary_clicked()) && !te_window{
                         tracing::error!("Pointer primary clicked");
                         match drawing_mode {
                             DrawingMode::Text => {
                                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("TE_open"), true));
-                                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("TE_pos"), mouse));
-                                
-                                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Drawing"), drawings.clone()));
+                                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("TE_continue"), false));
+                                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Text_pos"), mouse));
                             },
                             _ => {},
                         }
@@ -246,7 +281,6 @@ impl KrustyGrab {
                                 starting_pos
                             }
                         };
-
 
                         match drawing_mode {
                             DrawingMode::Brush => {
@@ -391,23 +425,30 @@ impl KrustyGrab {
                     }
                 }
                 else {
-                    if ctx.input(|i| i.pointer.primary_released()) {
+                    let primary_up = !ctx.input(|i| i.pointer.primary_down());
+
+                    if drawing_mode == DrawingMode::Brush || primary_up {
                         ctx.memory_mut(|mem| {
                             if drawing_mode == DrawingMode::Brush {
                                 match drawings.last_mut() {
                                     Some(d) => match d {
                                         DrawingType::Brush { points: _points, s: _s, end } => {
                                             *end = true;
-                                            println!("ciaos - {end:?}");
                                         },
                                         _ => {},
                                     }
                                     _ => {},
                                 }
                                 mem.data.insert_temp(Id::from("Drawing"), drawings.clone());
-                            };
-    
-                            mem.data.remove::<Pos2>(Id::from("previous_pos"));
+                            }
+
+                            if drawing_mode == DrawingMode::Brush && !primary_up {
+                                mem.data.insert_temp(Id::from("previous_pos"), mouse);
+                            }
+                            else {
+                                mem.data.remove::<Pos2>(Id::from("previous_pos"));
+                            }
+                            
                             mem.data.remove::<Pos2>(Id::from("initial_pos"));
                             mem.data.remove::<Rect>(Id::from("hover_rect"));
                         });
