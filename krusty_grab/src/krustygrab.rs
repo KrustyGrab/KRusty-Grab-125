@@ -149,8 +149,6 @@ impl KrustyGrab {
 
                 self.render_drawing(ctx, ui);
             }
-
-            self.render_bottom_panel(ctx);
         });        
     }
 
@@ -258,6 +256,7 @@ impl App for KrustyGrab {
         }
         
         self.render_top_panel(ctx);
+        self.render_bottom_panel(ctx);
         self.render_central_panel(ctx);
     }  
 }
