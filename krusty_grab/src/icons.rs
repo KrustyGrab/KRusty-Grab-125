@@ -33,6 +33,14 @@ pub fn icon_img(name: &str, ctx: &Context) -> TextureId {
             "camera",
             include_bytes!("./images/camera.svg"),
             egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+        "undo" => RetainedImage::from_svg_bytes_with_size(
+            "undo",
+            include_bytes!("./images/undo.svg"),
+            egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+        "select" => RetainedImage::from_svg_bytes_with_size(
+            "select",
+            include_bytes!("./images/select.svg"),
+            egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
         _ => panic!("Invalid icon")
     }
 }

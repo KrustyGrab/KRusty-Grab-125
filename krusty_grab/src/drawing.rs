@@ -98,6 +98,23 @@ impl KrustyGrab {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Thickness"), thickness));
                 tracing::error!("Thickness changed to {:?}", thickness);
             }
+
+            if Button::image_and_text(icon_img("undo", ctx), ICON_SIZE, "")
+            .stroke(Stroke::new(1.0,
+                Color32::from_rgb(128, 106, 0)))
+                .ui(ui).clicked() {
+                // ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Text));
+                tracing::error!("Undo selected");
+            }
+
+            if Button::image_and_text(icon_img("select", ctx), ICON_SIZE, "")
+            .stroke(Stroke::new(1.0,
+                Color32::from_rgb(128, 106, 0)))
+                .ui(ui).clicked() {
+                // ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Text));
+                tracing::error!("Select area button selected");
+            }
+            
         });
     }
 
@@ -146,13 +163,13 @@ impl KrustyGrab {
             Some(c) => c,
             None => Rgba::from(Color32::GREEN)
         };
-        tracing::error!("Color from memory: {:?}", color);
+        // tracing::error!("Color from memory: {:?}", color);
 
         let mut thickness = match ctx.memory(|mem| mem.data.get_temp::<f32>(Id::from("Thickness"))){
             Some(t) => t,
             None => 1.0
         };
-        tracing::error!("Thickness from memory: {}", thickness);
+        // tracing::error!("Thickness from memory: {}", thickness);
 
         let mut stroke = Stroke::new(thickness, color);
 
