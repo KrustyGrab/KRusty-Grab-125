@@ -1,4 +1,4 @@
-#![allow(unused)]
+// #![allow(unused)]
 use std::{
     ffi::OsString,
     fs::File,
@@ -8,27 +8,9 @@ use std::{
 };
 
 use anyhow::Error;
-use egui::ColorImage;
-use image::{ImageBuffer, ImageEncoder, ImageFormat, Rgba};
+use egui::{ColorImage};
+use image::{ImageBuffer, ImageFormat, Rgba};
 use screenshots::Screen;
-
-pub struct Shape {
-    start_x: usize,
-    start_y: usize,
-    width: usize,
-    height: usize,
-}
-
-impl Shape {
-    pub fn new(x: usize, y: usize, width: usize, height: usize) -> Self {
-        Self {
-            start_x: x,
-            start_y: y,
-            width,
-            height,
-        }
-    }
-}
 
 pub enum SaveFormat {
     Png,
@@ -57,7 +39,7 @@ impl<'a> SaveOptions<'a> {
         Self {
             format: SaveFormat::Png,
             path: Box::new(Path::new("./")),
-            file_name: OsString::from_str("out").unwrap(),
+            file_name: OsString::from_str("out").expect("The OsString must be correctly created"),
         }
     }
 
@@ -103,27 +85,11 @@ impl<'a> SaveOptions<'a> {
     }
 }
 
+///Take a screenshot and converts it in a egui::ColorImage
 pub fn take_screen(screen_src: usize) -> Result<ColorImage, Error> {
     let screen = Screen::all()?[screen_src];
 
     match screen.capture() {
-        Ok(image) => Ok(ColorImage::from_rgba_unmultiplied(
-            [image.width() as usize, image.height() as usize],
-            image.rgba(),
-        )),
-        Err(e) => Err(e),
-    }
-}
-
-pub fn take_crop_screen(screen_src: usize, crop: Shape) -> Result<ColorImage, Error> {
-    let screen = Screen::all()?[screen_src];
-
-    match screen.capture_area(
-        crop.start_x as i32,
-        crop.start_y as i32,
-        crop.width as u32,
-        crop.height as u32,
-    ) {
         Ok(image) => Ok(ColorImage::from_rgba_unmultiplied(
             [image.width() as usize, image.height() as usize],
             image.rgba(),
@@ -145,7 +111,6 @@ pub fn save_image(image: ColorImage, save_options: SaveOptions) -> Result<(), Er
             .expect("Unable to obtain ImageBuffer from vec");
 
     let save_path = save_options.save_path();
-    let format: ImageFormat;
 
     let t = Instant::now();
 
@@ -179,6 +144,5 @@ pub fn save_image(image: ColorImage, save_options: SaveOptions) -> Result<(), Er
 
             return Ok(());
         }
-        _ => return Err(Error::msg("Incompatible image format selected")),
     }
 }
