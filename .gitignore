@@ -1,1 +1,4 @@
 /krusty_grab/target
+/.vscode
+/.github
+/krusty_grab/*out*
