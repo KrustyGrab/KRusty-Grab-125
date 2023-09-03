@@ -3,6 +3,7 @@ use egui_extras::RetainedImage;
 
 pub const ICON_SIZE: Vec2 = Vec2::splat(28.0);
 
+//TODO inserire variante colore delle icone
 pub fn icon_img(name: &str, ctx: &Context) -> TextureId {
     match name {
         "pencil" => RetainedImage::from_svg_bytes_with_size(
@@ -36,6 +37,10 @@ pub fn icon_img(name: &str, ctx: &Context) -> TextureId {
         "undo" => RetainedImage::from_svg_bytes_with_size(
             "undo",
             include_bytes!("./images/undo.svg"),
+            egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+        "redo" => RetainedImage::from_svg_bytes_with_size(
+            "redo",
+            include_bytes!("./images/redo.svg"),
             egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
         "select" => RetainedImage::from_svg_bytes_with_size(
             "select",

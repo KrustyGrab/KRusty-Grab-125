@@ -1,7 +1,7 @@
 use egui::{Context, Pos2, Stroke, Rect, Vec2, Rgba, Color32, Layout, Align, Button, Id, color_picker::{color_edit_button_rgba, Alpha}, DragValue, Ui, LayerId, Order, pos2, Align2, FontId, Widget, Window};
 use egui_extras::RetainedImage;
 use serde::{Serialize, Deserialize};
-use crate::krustygrab::{self, KrustyGrab, };
+use crate::{krustygrab::{self, KrustyGrab, }, screenshot::screen_capture::take_screen};
 use crate::icons::{icon_img, ICON_SIZE};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -14,7 +14,7 @@ enum DrawingMode {
 }
 
 #[derive(Clone, Debug)]
-enum DrawingType {
+pub enum DrawingType {
     Brush {points: Vec<Pos2>, s: Stroke, end: bool},
     Rectangle {r: Rect, s: Stroke},
     Circle {c: Pos2, r: f32, s: Stroke},
@@ -23,7 +23,9 @@ enum DrawingType {
 }
 
 impl KrustyGrab {
-    pub fn render_drawing_toolbar(&self, ctx: &Context, ui: &mut Ui) {
+    const REDO_LIST_SIZE: usize = 10;        //TODO impostare a 10
+
+    pub fn render_drawing_toolbar(&mut self, ctx: &Context, ui: &mut Ui, frame: &mut eframe::Frame) {
         let mut color = match ctx.memory(|mem| mem.data.get_temp::<Rgba>(Id::from("Color"))){
             Some(c) => c,
             None => Rgba::from(Color32::GREEN)
@@ -99,19 +101,99 @@ impl KrustyGrab {
                 tracing::error!("Thickness changed to {:?}", thickness);
             }
 
+            //TODO disabilitare tasto in caso di lista disegni vuota (controllo se vuota alla pressione già effettuato, manca solo parte estetica)
+            //TODO vedere se si riesce a trovare una forma di buffer limitato circolare da cui si possa rimuovere e inserire dalla coda
             if Button::image_and_text(icon_img("undo", ctx), ICON_SIZE, "")
             .stroke(Stroke::new(1.0,
                 Color32::from_rgb(128, 106, 0)))
                 .ui(ui).clicked() {
-                // ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Text));
+                ctx.memory_mut(|mem| {
+                    match mem.data.get_temp::<Vec<DrawingType>>(Id::from("Drawing")) {
+                        Some(mut drawings) => {
+                            //Check if some drawing exists
+                            if !drawings.is_empty() {
+                                let last = drawings.pop().expect("Drawings list should contains at least one element at this point");
+
+                                //Retrieve and update Redo list
+                                let redo_list = match mem.data.get_temp::<Vec<DrawingType>>(Id::from("Redo_list")){
+                                    Some(mut redo) => {
+                                        redo.push(last);
+                                        redo
+                                    },
+                                    None => {
+                                        let mut redo = Vec::<DrawingType>::with_capacity(KrustyGrab::REDO_LIST_SIZE);
+                                        redo.push(last);
+                                        redo
+                                    },
+                                };
+                                
+                                mem.data.insert_temp(Id::from("Redo_list"), redo_list);
+                                mem.data.insert_temp(Id::from("Drawing"), drawings);
+                            }
+                        },
+                        None => {},
+                    };
+                });
                 tracing::error!("Undo selected");
+            }
+
+            //TODO cambiare il contenuto del file images/redo.svg per aggiornare l'icona
+            //TODO disabilitare tasto in caso di lista redo vuota (controllo se vuota alla pressione già effettuato, manca solo parte estetica)
+            if Button::image_and_text(icon_img("redo", ctx), ICON_SIZE, "")
+            .stroke(Stroke::new(1.0,
+                Color32::from_rgb(128, 106, 0)))
+                .ui(ui).clicked() {
+                ctx.memory_mut(|mem| {
+                    match mem.data.get_temp::<Vec<DrawingType>>(Id::from("Redo_list")) {
+                        Some(mut redo) => {
+                            //Check if some drawing exists in redo list
+                            if !redo.is_empty() {
+                                let last = redo.pop().expect("Redo list should contains at least one element at this point");
+    
+                                //Retrieve and update drawings list
+                                match mem.data.get_temp::<Vec<DrawingType>>(Id::from("Drawing")) {
+                                    Some(mut d) => {
+                                        d.push(last);
+                                        mem.data.insert_temp(Id::from("Drawing"), d);
+                                    },
+                                    None => panic!("Drawings list should exists in memory at this point"),
+                                }
+                                
+                                mem.data.insert_temp(Id::from("Redo_list"), redo);
+                            }
+                        },
+                        None => {},
+                    };
+                });
+                tracing::error!("Redo selected");
             }
 
             if Button::image_and_text(icon_img("select", ctx), ICON_SIZE, "")
             .stroke(Stroke::new(1.0,
                 Color32::from_rgb(128, 106, 0)))
                 .ui(ui).clicked() {
-                // ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Text));
+                    
+                ctx.memory_mut(|mem| {
+                    let window_maximized = frame.info().window_info.maximized;
+                    println!("Window maximized? {window_maximized:?}");
+
+                    if !window_maximized {
+                        let window_size = frame.info().window_info.size;
+                        let window_pos = frame.info().window_info.position.expect("Window position should be Some");
+                        
+                        mem.data.insert_temp(Id::from("Window_size"), window_size);
+                        mem.data.insert_temp(Id::from("Window_pos"), window_pos);
+                        println!("PRE Window size and pos: {window_size:?} - {window_pos:?}");
+                    }
+                    
+                    mem.data.insert_temp(Id::from("Window_maximized"), window_maximized);
+                });
+
+                self.set_window_status(krustygrab::WindowStatus::Crop);
+
+                if self.get_temp_image().is_none() {
+                    self.set_screenshot(ctx);
+                }
                 tracing::error!("Select area button selected");
             }
             
@@ -281,7 +363,10 @@ impl KrustyGrab {
                     }
 
                     drawings.push(DrawingType::Text { p: text_pos, t: text, s: stroke });
-                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Drawing"), drawings.clone()));
+                    ctx.memory_mut(|mem| {
+                        mem.data.insert_temp(Id::from("Drawing"), drawings.clone());
+                        mem.data.remove::<Vec<DrawingType>>(Id::from("Redo_list"));
+                    });
                 }
             });
         }
@@ -460,6 +545,7 @@ impl KrustyGrab {
                                     mem.data.insert_temp(Id::from("Drawing"), drawings.clone());
                                     mem.data.remove::<Pos2>(Id::from("initial_pos"));
                                     mem.data.remove::<Rect>(Id::from("hover_rect"));
+                                    mem.data.remove::<Vec<DrawingType>>(Id::from("Redo_list"));
                                 });
                             },
                             None => {},
@@ -505,6 +591,7 @@ impl KrustyGrab {
         }
     }
 
+    ///Scale the drawing position with the actual image reduction ratio in order to maintain the drawing in position after a rescale of the window that visualize it
     fn adjust_drawing_pos(&mut self, ctx: &Context, pos: Pos2, render: bool) -> Pos2{
         let adjusted_pos: Pos2;
         let v_ratio: f32 = ctx.memory(|mem| {

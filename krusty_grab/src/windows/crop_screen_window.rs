@@ -4,15 +4,19 @@ use egui::{
 };
 use egui_extras::RetainedImage;
 
-use crate::manage_window::{GrabStatus, Status, WindowStatus};
+use crate::krustygrab::{GrabStatus, KrustyGrab, WindowStatus};
 
-impl Status {
+impl KrustyGrab {
     const OVERLAY_COLOR: Color32 = Color32::from_black_alpha(100);
     const ADJUST_POINTS_COLOR: Color32 = Color32::from_rgb(100, 10, 10);
     const GRABBABLE_POINTS_SIZE: f32 = 10.0;
 
     ///Manage the visualization of the area selection.
     pub fn crop_screen_window(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+        //Set the frame to fullscreen and enable the visibility
+        _frame.set_fullscreen(true);
+        _frame.set_visible(true);
+
         CentralPanel::default().show(ctx, |_ui| {
             let window_size = _frame.info().window_info.size;
             let mut painter = ctx.layer_painter(LayerId::background());
@@ -39,7 +43,7 @@ impl Status {
             //Buttons for confirming or cancelling area selection. Visibles only when no manipulation is ongoing
             let mut save_rect: Rect = Rect::NOTHING;
             let mut cancel_rect: Rect = Rect::NOTHING;
-            //TODO decidere forma e posizione pulsanti
+            //TODO decidere forma e posizione pulsanti. Decidere se fare una funzione separata
             if self.get_grab_status() == GrabStatus::None {
                 _ui.with_layer_id(
                     LayerId::new(egui::Order::Foreground, Id::from("Save")),
@@ -48,6 +52,8 @@ impl Status {
                             let save = ui.add_sized([60., 20.], Button::new("Save"));
                             let cancel =
                                 ui.add_sized([60., 20.], Button::new("Cancel").rounding(30.));
+
+                            let mut pressed = false;
 
                             save_rect = save.rect;
                             cancel_rect = cancel.rect;
@@ -73,8 +79,7 @@ impl Status {
                                         mem.data.remove::<Option<Rect>>(Id::from("Prev_area"))
                                     });
 
-                                    //Return to main window
-                                    self.set_window_status(WindowStatus::Main);
+                                    pressed = true;
                                 }
                             }
                             //Cancel button
@@ -86,7 +91,9 @@ impl Status {
 
                                 if ctx.input(|i| i.pointer.primary_clicked()) {
                                     let prev_area = ctx.memory_mut(|mem| {
-                                        let p = match mem.data.get_temp::<Option<Rect>>(Id::from("Prev_area"))
+                                        let p = match mem
+                                            .data
+                                            .get_temp::<Option<Rect>>(Id::from("Prev_area"))
                                         {
                                             Some(p) => p,
                                             None => None,
@@ -97,15 +104,53 @@ impl Status {
 
                                     self.set_select_area(prev_area);
 
-                                    //Return to main window
-                                    self.set_window_status(WindowStatus::Main);
+                                    pressed = true;
                                 }
+                            }
+
+                            //Return to main window and reshape the window if any button pressed
+                            if pressed {
+                                self.set_window_status(WindowStatus::Main);
+
+                                _frame.set_fullscreen(false);
+                                ctx.memory(|mem| {
+                                    let window_maximized = match mem
+                                        .data
+                                        .get_temp::<bool>(Id::from("Window_maximized"))
+                                    {
+                                        Some(max) => max,
+                                        None => false,
+                                    };
+
+                                    if !window_maximized {
+                                        let window_sz = match mem
+                                            .data
+                                            .get_temp::<Vec2>(Id::from("Window_size"))
+                                        {
+                                            Some(size) => size,
+                                            None => Vec2::new(800., 450.),
+                                        };
+                                        let window_pos =
+                                            match mem.data.get_temp::<Pos2>(Id::from("Window_pos"))
+                                            {
+                                                Some(pos) => pos,
+                                                None => pos2(26., 26.),
+                                            };
+
+                                        _frame.set_window_pos(window_pos);
+                                        _frame.set_window_size(window_sz);
+                                        println!("Retrieved window size and pos: {window_sz:?} - {window_pos:?}");
+                                    }
+
+                                    _frame.set_maximized(window_maximized);
+                                });
                             }
                         });
                     },
                 );
             }
 
+            //TODO sistemare la visualizzazione dei disegni durante il ritaglio e dopo in maniera corretta
             //Setting the visualization area and the screenshot as background
             painter.set_clip_rect(Rect::from_min_size(pos2(0.0, 0.0), window_size));
             painter.image(
@@ -124,10 +169,6 @@ impl Status {
             {
                 self.select_area(ctx, _frame);
             }
-
-            //Set the frame to fullscreen and enable the visibility
-            _frame.set_fullscreen(true);
-            _frame.set_visible(true);
         });
     }
 
@@ -165,7 +206,7 @@ impl Status {
         }
     }
 
-    ///Draw the selected area if Some. Constant [`Status::OVERLAY_COLOR`] is used as the color for the overlay.
+    ///Draw the selected area if Some. Constant [`KrustyGrab::OVERLAY_COLOR`] is used as the color for the overlay.
     fn show_selected_area(
         &mut self,
         ctx: &Context,
@@ -192,34 +233,34 @@ impl Status {
                 painter.rect_filled(
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(min_x, window_size.y)),
                     0.0,
-                    Status::OVERLAY_COLOR,
+                    KrustyGrab::OVERLAY_COLOR,
                 );
                 painter.rect_filled(
                     Rect::from_min_max(pos2(max_x, 0.0), pos2(window_size.x, window_size.y)),
                     0.0,
-                    Status::OVERLAY_COLOR,
+                    KrustyGrab::OVERLAY_COLOR,
                 );
                 painter.rect_filled(
                     Rect::from_min_max(pos2(min_x, 0.0), pos2(max_x, min_y)),
                     0.0,
-                    Status::OVERLAY_COLOR,
+                    KrustyGrab::OVERLAY_COLOR,
                 );
                 painter.rect_filled(
                     Rect::from_min_max(pos2(min_x, max_y), pos2(max_x, window_size.y)),
                     0.0,
-                    Status::OVERLAY_COLOR,
+                    KrustyGrab::OVERLAY_COLOR,
                 );
             }
             None => painter.rect_filled(
                 //Draw the overlay on all the screen
                 Rect::from_min_size(pos2(0.0, 0.0), window_size),
                 0.0,
-                Status::OVERLAY_COLOR,
+                KrustyGrab::OVERLAY_COLOR,
             ),
         }
     }
 
-    ///Draw and manage the points used for the resizing of the selection area. Constant [`Status::ADJUST_POINTS_COLOR`] is used as the color for the points ans [`Status::GRABBABLE_POINTS_SIZE`] as the size.
+    ///Draw and manage the points used for the resizing of the selection area. Constant [`KrustyGrab::ADJUST_POINTS_COLOR`] is used as the color for the points ans [`KrustyGrab::GRABBABLE_POINTS_SIZE`] as the size.
     fn grabbable_corners(
         &mut self,
         ctx: &Context,
@@ -233,7 +274,7 @@ impl Status {
 
         //The draggable points are drawn only when the selction sequence is not ongoing
         if grab_status != GrabStatus::Select {
-            let point_dim = Vec2::splat(Status::GRABBABLE_POINTS_SIZE);
+            let point_dim = Vec2::splat(KrustyGrab::GRABBABLE_POINTS_SIZE);
 
             //Handle points shapes
             let tl_point = Rect::from_center_size(sel.left_top(), point_dim);
@@ -248,22 +289,22 @@ impl Status {
             //Handles are only drawn if the selection area is not being moved
             if grab_status != GrabStatus::Move {
                 //Draw the handles for resizing
-                painter.rect_filled(tl_point, 0.0, Status::ADJUST_POINTS_COLOR);
-                painter.rect_filled(tr_point, 0.0, Status::ADJUST_POINTS_COLOR);
-                painter.rect_filled(bl_point, 0.0, Status::ADJUST_POINTS_COLOR);
-                painter.rect_filled(br_point, 0.0, Status::ADJUST_POINTS_COLOR);
+                painter.rect_filled(tl_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
+                painter.rect_filled(tr_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
+                painter.rect_filled(bl_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
+                painter.rect_filled(br_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
 
-                painter.rect_filled(tm_point, 0.0, Status::ADJUST_POINTS_COLOR);
-                painter.rect_filled(ml_point, 0.0, Status::ADJUST_POINTS_COLOR);
-                painter.rect_filled(mr_point, 0.0, Status::ADJUST_POINTS_COLOR);
-                painter.rect_filled(bm_point, 0.0, Status::ADJUST_POINTS_COLOR);
+                painter.rect_filled(tm_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
+                painter.rect_filled(ml_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
+                painter.rect_filled(mr_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
+                painter.rect_filled(bm_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
             }
 
             //Handle the handles interaction
             match ctx.pointer_hover_pos() {
                 Some(pos) => {
                     let mut new_status = GrabStatus::None;
-                    
+
                     if tm_point.contains(pos) || grab_status == GrabStatus::TopMid {
                         ctx.set_cursor_icon(CursorIcon::ResizeNorth);
                         new_status = GrabStatus::TopMid;
@@ -293,7 +334,7 @@ impl Status {
                         new_status = GrabStatus::Move;
                     }
 
-                    if new_status != GrabStatus::None{
+                    if new_status != GrabStatus::None {
                         self.update_area(ctx, _frame, pos, new_status);
                     }
                 }

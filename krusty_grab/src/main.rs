@@ -1,6 +1,8 @@
 mod krustygrab;
 mod drawing;
 mod icons;
+mod windows;
+mod screenshot;
 
 use eframe::{run_native, NativeOptions};
 use egui::Vec2;

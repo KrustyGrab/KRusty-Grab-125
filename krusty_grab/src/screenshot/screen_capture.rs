@@ -10,7 +10,7 @@ use std::{
 use anyhow::Error;
 use egui::{ColorImage};
 use image::{ImageBuffer, ImageFormat, Rgba};
-use screenshots::Screen;
+use screenshots::{Screen, Image};
 
 pub enum SaveFormat {
     Png,

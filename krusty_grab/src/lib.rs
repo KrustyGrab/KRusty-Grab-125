@@ -1,2 +1,5 @@
 pub mod windows;
-pub mod manage_window;
+pub mod krustygrab;
+pub mod icons;
+pub mod drawing;
+pub mod screenshot;
