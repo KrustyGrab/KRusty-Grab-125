@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use egui::{Context, Pos2, Stroke, Rect, Vec2, Rgba, Color32, Layout, Align, Button, Id, color_picker::{color_edit_button_rgba, Alpha}, DragValue, Ui, LayerId, Order, pos2, Align2, FontId, Widget, Window};
 use egui_extras::RetainedImage;
 use serde::{Serialize, Deserialize};
@@ -21,6 +23,33 @@ pub enum DrawingType {
     Arrow {p: Pos2, v: Vec2, s: Stroke},
     Text {p: Pos2, t: String, s: Stroke}, //???
 }
+
+struct RedoList {
+    drawings: VecDeque<DrawingType>,
+    cap: usize,
+}
+
+impl RedoList {
+    fn new(capacity: usize) -> Self {
+        RedoList { drawings: VecDeque::with_capacity(capacity), cap: capacity }
+    }
+
+    fn push(&mut self, d: DrawingType) {
+        if self.drawings.len() >= self.cap {
+           self.drawings.pop_front(); 
+        }
+        self.drawings.push_back(d);
+    }
+
+    fn pop(&mut self) -> Option<DrawingType> {
+        self.drawings.pop_back()
+    }
+
+    fn len(&self) -> usize { 
+        self.cap
+    }
+}
+
 
 impl KrustyGrab {
     const REDO_LIST_SIZE: usize = 10;        //TODO impostare a 10
