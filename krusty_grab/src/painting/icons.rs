@@ -46,6 +46,10 @@ pub fn icon_img(name: &str, ctx: &Context) -> TextureId {
             "select",
             include_bytes!("./images/select.svg"),
             egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+        "timer" => RetainedImage::from_svg_bytes_with_size(
+            "timer",
+            include_bytes!("./images/timer.svg"),
+            egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
         _ => panic!("Invalid icon")
     }
 }

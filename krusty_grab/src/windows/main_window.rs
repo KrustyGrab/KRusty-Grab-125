@@ -89,6 +89,21 @@ impl KrustyGrab {
                         tracing::error!("Screen button clicked");
                         self.set_screenshot(ctx);
                     }
+
+                    ui.menu_image_button(icon_img("timer", ctx), ICON_SIZE, |ui| {
+                        if ui.button(RichText::new("5 seconds").text_style(TextStyle::Body)).clicked() {
+                            ui.close_menu();
+                        }
+                        if ui.button(RichText::new("10 seconds").text_style(TextStyle::Body)).clicked() {
+                            ui.close_menu();
+                        }
+                        if ui.button(RichText::new("15 seconds").text_style(TextStyle::Body)).clicked() {
+                            ui.close_menu();
+                        }
+                        if ui.button(RichText::new("30 seconds").text_style(TextStyle::Body)).clicked() {
+                            ui.close_menu();
+                        }
+                    });
                 });
             });
             ui.add_space(3.);
