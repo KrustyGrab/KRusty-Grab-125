@@ -1,5 +1,5 @@
 use egui::{Context, TopBottomPanel, menu, RichText, TextStyle, Layout, Button, ColorImage, CentralPanel, Widget, Id};
-use crate::{krustygrab::{KrustyGrab, KrustyGrabConfig}, icons::{icon_img, ICON_SIZE}, drawing::DrawingType};
+use crate::{krustygrab::{KrustyGrab, KrustyGrabConfig}, painting::icons::{icon_img, ICON_SIZE}, painting::drawing::DrawingType};
 pub use crate::screenshot::screen_capture::take_screen;
 
 impl KrustyGrab {

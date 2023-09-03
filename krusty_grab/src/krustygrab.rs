@@ -1,4 +1,4 @@
-use crate::icons::{icon_img, ICON_SIZE};
+use crate::painting::icons::{icon_img, ICON_SIZE};
 use eframe::{egui_glow::painter, App, CreationContext};
 use egui::{
     color_picker::{color_edit_button_rgba, Alpha},

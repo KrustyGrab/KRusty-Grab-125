@@ -2,7 +2,7 @@ use egui::{Context, Pos2, Stroke, Rect, Vec2, Rgba, Color32, Layout, Align, Butt
 use egui_extras::RetainedImage;
 use serde::{Serialize, Deserialize};
 use crate::{krustygrab::{self, KrustyGrab, }, screenshot::screen_capture::take_screen};
-use crate::icons::{icon_img, ICON_SIZE};
+use crate::painting::icons::{icon_img, ICON_SIZE};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 enum DrawingMode {
