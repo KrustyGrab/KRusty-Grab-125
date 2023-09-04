@@ -113,37 +113,6 @@ impl KrustyGrab {
                                 self.set_window_status(WindowStatus::Main);
 
                                 _frame.set_fullscreen(false);
-                                ctx.memory(|mem| {
-                                    let window_maximized = match mem
-                                        .data
-                                        .get_temp::<bool>(Id::from("Window_maximized"))
-                                    {
-                                        Some(max) => max,
-                                        None => false,
-                                    };
-
-                                    if !window_maximized {
-                                        let window_sz = match mem
-                                            .data
-                                            .get_temp::<Vec2>(Id::from("Window_size"))
-                                        {
-                                            Some(size) => size,
-                                            None => Vec2::new(800., 450.),
-                                        };
-                                        let window_pos =
-                                            match mem.data.get_temp::<Pos2>(Id::from("Window_pos"))
-                                            {
-                                                Some(pos) => pos,
-                                                None => pos2(26., 26.),
-                                            };
-
-                                        _frame.set_window_pos(window_pos);
-                                        _frame.set_window_size(window_sz);
-                                        println!("Retrieved window size and pos: {window_sz:?} - {window_pos:?}");
-                                    }
-
-                                    _frame.set_maximized(window_maximized);
-                                });
                             }
                         });
                     },

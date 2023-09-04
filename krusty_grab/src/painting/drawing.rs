@@ -24,6 +24,7 @@ pub enum DrawingType {
     Text {p: Pos2, t: String, s: Stroke}, //???
 }
 
+#[derive(Clone)]
 struct RedoList {
     drawings: VecDeque<DrawingType>,
     cap: usize,
@@ -31,7 +32,7 @@ struct RedoList {
 
 impl RedoList {
     fn new(capacity: usize) -> Self {
-        RedoList { drawings: VecDeque::with_capacity(capacity), cap: capacity }
+        RedoList { drawings: VecDeque::<DrawingType>::with_capacity(capacity), cap: capacity }
     }
 
     fn push(&mut self, d: DrawingType) {
@@ -48,11 +49,15 @@ impl RedoList {
     fn len(&self) -> usize { 
         self.cap
     }
+
+    fn is_empty(&self) -> bool {
+        self.drawings.is_empty()
+    }
 }
 
 
 impl KrustyGrab {
-    const REDO_LIST_SIZE: usize = 10;        //TODO impostare a 10
+    const REDO_LIST_SIZE: usize = 10;
 
     pub fn render_drawing_toolbar(&mut self, ctx: &Context, ui: &mut Ui, frame: &mut eframe::Frame) {
         let mut color = match ctx.memory(|mem| mem.data.get_temp::<Rgba>(Id::from("Color"))){
@@ -131,7 +136,6 @@ impl KrustyGrab {
             }
 
             //TODO disabilitare tasto in caso di lista disegni vuota (controllo se vuota alla pressione già effettuato, manca solo parte estetica)
-            //TODO vedere se si riesce a trovare una forma di buffer limitato circolare da cui si possa rimuovere e inserire dalla coda
             if Button::image_and_text(icon_img("undo", ctx), ICON_SIZE, "")
             .stroke(Stroke::new(1.0,
                 Color32::from_rgb(128, 106, 0)))
@@ -144,13 +148,13 @@ impl KrustyGrab {
                                 let last = drawings.pop().expect("Drawings list should contains at least one element at this point");
 
                                 //Retrieve and update Redo list
-                                let redo_list = match mem.data.get_temp::<Vec<DrawingType>>(Id::from("Redo_list")){
+                                let redo_list = match mem.data.get_temp::<RedoList>(Id::from("Redo_list")){
                                     Some(mut redo) => {
                                         redo.push(last);
                                         redo
                                     },
                                     None => {
-                                        let mut redo = Vec::<DrawingType>::with_capacity(KrustyGrab::REDO_LIST_SIZE);
+                                        let mut redo = RedoList::new(KrustyGrab::REDO_LIST_SIZE);
                                         redo.push(last);
                                         redo
                                     },
@@ -166,14 +170,13 @@ impl KrustyGrab {
                 tracing::error!("Undo selected");
             }
 
-            //TODO cambiare il contenuto del file images/redo.svg per aggiornare l'icona
             //TODO disabilitare tasto in caso di lista redo vuota (controllo se vuota alla pressione già effettuato, manca solo parte estetica)
             if Button::image_and_text(icon_img("redo", ctx), ICON_SIZE, "")
             .stroke(Stroke::new(1.0,
                 Color32::from_rgb(128, 106, 0)))
                 .ui(ui).clicked() {
                 ctx.memory_mut(|mem| {
-                    match mem.data.get_temp::<Vec<DrawingType>>(Id::from("Redo_list")) {
+                    match mem.data.get_temp::<RedoList>(Id::from("Redo_list")) {
                         Some(mut redo) => {
                             //Check if some drawing exists in redo list
                             if !redo.is_empty() {
@@ -362,7 +365,8 @@ impl KrustyGrab {
                 None => false,
             };
 
-            //Calcolo posizione text editor per non farlo uscire dallo schermo (valori ottenuti in modo sperimentale)
+            //Computation of text editor position in order to maintain it inside the screen (values are obtained experimentally)
+            //TODO controllo orizzontale
             let mut te_pos = self.adjust_drawing_pos(ctx, text_pos, true);
 
             if te_pos.y + 97.0 > area.size()[1] + area.min.y {
@@ -394,7 +398,7 @@ impl KrustyGrab {
                     drawings.push(DrawingType::Text { p: text_pos, t: text, s: stroke });
                     ctx.memory_mut(|mem| {
                         mem.data.insert_temp(Id::from("Drawing"), drawings.clone());
-                        mem.data.remove::<Vec<DrawingType>>(Id::from("Redo_list"));
+                        mem.data.remove::<RedoList>(Id::from("Redo_list"));
                     });
                 }
             });
@@ -412,7 +416,7 @@ impl KrustyGrab {
                     mouse = self.adjust_drawing_pos(ctx, mouse, false);
 
                     if ctx.input(|i| i.pointer.primary_clicked()) && !te_window{
-                        tracing::error!("Pointer primary clicked");
+                        // tracing::error!("Pointer primary clicked");
                         match drawing_mode {
                             DrawingMode::Text => {
                                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("TE_open"), true));
@@ -424,7 +428,7 @@ impl KrustyGrab {
                     }
 
                     if ctx.input(|i| i.pointer.primary_down()) {
-                        tracing::error!("Pointer primary down");
+                        // tracing::error!("Pointer primary down");
                         let mut p0 = match ctx.memory(|mem| mem.data.get_temp(Id::from("initial_pos"))) {
                             Some(p) => p,
                             None => {
@@ -522,7 +526,7 @@ impl KrustyGrab {
                     }
 
                     if ctx.input(|i| i.pointer.primary_released()) {
-                        tracing::error!("Pointer primary released");
+                        // tracing::error!("Pointer primary released");
                         match ctx.memory(|mem| mem.data.get_temp::<Pos2>(Id::from("initial_pos"))) {
                             Some(mut p0) => {
                                 match drawing_mode {
@@ -574,7 +578,7 @@ impl KrustyGrab {
                                     mem.data.insert_temp(Id::from("Drawing"), drawings.clone());
                                     mem.data.remove::<Pos2>(Id::from("initial_pos"));
                                     mem.data.remove::<Rect>(Id::from("hover_rect"));
-                                    mem.data.remove::<Vec<DrawingType>>(Id::from("Redo_list"));
+                                    mem.data.remove::<RedoList>(Id::from("Redo_list"));
                                 });
                             },
                             None => {},
