@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use egui::{Context, Pos2, Stroke, Rect, Vec2, Rgba, Color32, Layout, Align, Button, Id, color_picker::{color_edit_button_rgba, Alpha}, DragValue, Ui, LayerId, Order, pos2, Align2, FontId, Widget, Window};
+use egui::{Context, Pos2, Stroke, Rect, Vec2, Rgba, Color32, Layout, Align, Button, Id, color_picker::{color_edit_button_rgba, Alpha}, DragValue, Ui, LayerId, Order, pos2, Align2, FontId, Widget, Window, Painter};
 use egui_extras::RetainedImage;
 use serde::{Serialize, Deserialize};
 use crate::{krustygrab::{self, KrustyGrab, }, screenshot::screen_capture::take_screen};
@@ -273,52 +273,21 @@ impl KrustyGrab {
             None => Vec::<DrawingType>::new(),
         };
 
-        let mut color = match ctx.memory(|mem| mem.data.get_temp::<Rgba>(Id::from("Color"))){
+        let color = match ctx.memory(|mem| mem.data.get_temp::<Rgba>(Id::from("Color"))){
             Some(c) => c,
             None => Rgba::from(Color32::GREEN)
         };
         // tracing::error!("Color from memory: {:?}", color);
 
-        let mut thickness = match ctx.memory(|mem| mem.data.get_temp::<f32>(Id::from("Thickness"))){
+        let thickness = match ctx.memory(|mem| mem.data.get_temp::<f32>(Id::from("Thickness"))){
             Some(t) => t,
             None => 1.0
         };
         // tracing::error!("Thickness from memory: {}", thickness);
 
-        let mut stroke = Stroke::new(thickness, color);
+        let stroke = Stroke::new(thickness, color);
 
-        //Visualizzazione disegni salvati
-        for d in &drawings {
-            match d.clone() {
-                DrawingType::Brush { points, mut s, end } => {
-                    // s.width /= (screen.width() as f32 / w); //TODO  mettere se si vuole scalare il tratto
-                    for i in 1..points.len() {
-                        let to_paint = [self.adjust_drawing_pos(ctx, points[i], true), self.adjust_drawing_pos(ctx, points[i-1], true)];
-                        painter.line_segment(to_paint, s);
-                    }
-                },
-                DrawingType::Rectangle { r, s } => {
-                    let to_paint = Rect::from_min_max(self.adjust_drawing_pos(ctx, r.min, true), self.adjust_drawing_pos(ctx, r.max, true));
-                    painter.rect(to_paint, 0.0, s.color, s);
-                },
-                DrawingType::Circle { mut c, mut r, s } => {
-                    c = self.adjust_drawing_pos(ctx, c, true);
-                    r /= visualization_ratio;
-                    painter.circle(c, r, s.color, s);
-                },
-                DrawingType::Arrow { p, v, s } => {
-                    let origin = self.adjust_drawing_pos(ctx, p, true);
-                    let direction = v / visualization_ratio;
-                    painter.arrow(origin, direction, s);
-                },
-                DrawingType::Text { mut p , t , s} => {
-                    p = self.adjust_drawing_pos(ctx, p, true);
-                    //Regolazione del font in base alla dimensione della finestra di render
-                    let font_size = (15.0 + s.width) / 1.0; //visualization_ratio; //TODO vedere come rendere più funzionante la staticità del testo
-                    painter.text(p, Align2::LEFT_CENTER, t, FontId::new(font_size, egui::FontFamily::Proportional), s.color);
-                },
-            }
-        }
+        self.show_drawings(ctx, &painter, visualization_ratio);
 
         let color_picker_open = match ctx.memory(|mem| mem.data.get_temp::<bool>(Id::from("CP_open"))){
             Some(c) => c,
@@ -639,12 +608,91 @@ impl KrustyGrab {
                 None => Pos2::default(),
             }
         });
-        //TODO risolvere sbrego e calo fps
+        let area_min = match self.get_selected_area() {
+            Some(area) => area.min,
+            None => pos2(0., 0.),
+        };
+        
         if render {
-            adjusted_pos = pos2((pos.x / v_ratio) + v_pos.x, (pos.y / v_ratio) + v_pos.y);
+            adjusted_pos = pos2(((pos.x - area_min.x) / v_ratio) + v_pos.x, ((pos.y - area_min.y) / v_ratio) + v_pos.y);
         } else {
-            adjusted_pos = pos2((pos.x - v_pos.x) * v_ratio, (pos.y - v_pos.y) * v_ratio);
+            adjusted_pos = pos2((pos.x - v_pos.x) * v_ratio + area_min.x, (pos.y - v_pos.y) * v_ratio + area_min.y);
         }
         adjusted_pos
+    }
+
+    ///Shows the saved drawings
+    fn show_drawings(&mut self, ctx: &Context, painter: &Painter, visualization_ratio: f32) {
+        let drawings = match ctx.memory(|mem| mem.data.get_temp::<Vec<DrawingType>>(Id::from("Drawing"))) {
+            Some(v) => v,
+            None => Vec::<DrawingType>::new(),
+        };
+
+        //Visualization of saved drawings
+        for d in &drawings {
+            match d.clone() {
+                DrawingType::Brush { points, mut s, .. } => {
+                    // s.width /= (screen.width() as f32 / w); //TODO  mettere se si vuole scalare il tratto
+                    for i in 1..points.len() {
+                        let to_paint = [self.adjust_drawing_pos(ctx, points[i], true), self.adjust_drawing_pos(ctx, points[i-1], true)];
+                        painter.line_segment(to_paint, s);
+                    }
+                },
+                DrawingType::Rectangle { r, s } => {
+                    let to_paint = Rect::from_min_max(self.adjust_drawing_pos(ctx, r.min, true), self.adjust_drawing_pos(ctx, r.max, true));
+                    painter.rect(to_paint, 0.0, s.color, s);
+                },
+                DrawingType::Circle { mut c, mut r, s } => {
+                    c = self.adjust_drawing_pos(ctx, c, true);
+                    r /= visualization_ratio;
+                    painter.circle(c, r, s.color, s);
+                },
+                DrawingType::Arrow { p, v, s } => {
+                    let origin = self.adjust_drawing_pos(ctx, p, true);
+                    let direction = v / visualization_ratio;
+                    painter.arrow(origin, direction, s);
+                },
+                DrawingType::Text { mut p , t , s} => {
+                    p = self.adjust_drawing_pos(ctx, p, true);
+                    //Regolazione del font in base alla dimensione della finestra di render
+                    let font_size = (15.0 + s.width) / 1.0; //visualization_ratio; //TODO vedere come rendere più funzionante la staticità del testo
+                    painter.text(p, Align2::LEFT_CENTER, t, FontId::new(font_size, egui::FontFamily::Proportional), s.color);
+                },
+            }
+        }
+    }
+
+    ///Shows the saved drawings in the select mode
+    pub fn show_drawings_in_select(&mut self, ctx: &Context, painter: &Painter) {
+        let drawings = match ctx.memory(|mem| mem.data.get_temp::<Vec<DrawingType>>(Id::from("Drawing"))) {
+            Some(v) => v,
+            None => Vec::<DrawingType>::new(),
+        };
+
+        //Visualization of saved drawings
+        for d in &drawings {
+            match d.clone() {
+                DrawingType::Brush { points, s, .. } => {
+                    for i in 1..points.len() {
+                        let to_paint = [points[i], points[i-1]];
+                        painter.line_segment(to_paint, s);
+                    }
+                },
+                DrawingType::Rectangle { r, s } => {
+                    painter.rect(r, 0.0, s.color, s);
+                },
+                DrawingType::Circle { c, r, s } => {
+                    painter.circle(c, r, s.color, s);
+                },
+                DrawingType::Arrow { p, v, s } => {
+                    painter.arrow(p, v, s);
+                },
+                DrawingType::Text { p , t , s} => {
+                    //Regolazione del font in base alla dimensione della finestra di render
+                    let font_size = (15.0 + s.width);
+                    painter.text(p, Align2::LEFT_CENTER, t, FontId::new(font_size, egui::FontFamily::Proportional), s.color);
+                },
+            }
+        }
     }
 }

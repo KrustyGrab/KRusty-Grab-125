@@ -129,6 +129,8 @@ impl KrustyGrab {
                 Color32::WHITE,
             );
 
+            self.show_drawings_in_select(ctx, &painter);
+
             //Show the selected area if present
             self.show_selected_area(ctx, _frame, &mut painter);
 
