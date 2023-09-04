@@ -6,3 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.75"
+confy = "0.5.1"
+eframe = "0.22.0"
+egui = "0.22.0"
+egui_extras = {version="0.22.0", features = ["svg", "image"] }
+global-hotkey = "0.2.3"
+image = "0.24.7"
+keyboard-types = "0.6.2"
+screenshots = "0.7.1"
+serde = {version = "1.0.181", features = ["derive"]}
+tracing = "0.1.37"
+tracing-subscriber = "0.3.17"
