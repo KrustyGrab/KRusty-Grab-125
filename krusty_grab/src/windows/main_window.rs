@@ -1,9 +1,45 @@
-use egui::{Context, TopBottomPanel, menu, RichText, TextStyle, Layout, Button, ColorImage, CentralPanel, Widget, Id};
+use egui::{Context, TopBottomPanel, menu, RichText, TextStyle, Layout, Button, ColorImage, CentralPanel, Widget, Id, Vec2, Pos2, pos2};
 use crate::{krustygrab::{KrustyGrab, KrustyGrabConfig}, painting::icons::{icon_img, ICON_SIZE}, painting::drawing::DrawingType};
 pub use crate::screenshot::screen_capture::take_screen;
 
 impl KrustyGrab {
     pub fn main_window(&mut self, ctx: &Context, frame: &mut eframe::Frame){
+        if ctx.memory(|mem| mem.data.get_temp::<Vec2>(Id::from("Window_size")).is_some()) {
+            ctx.memory_mut(|mem| {
+                let window_maximized = match mem
+                    .data
+                    .get_temp::<bool>(Id::from("Window_maximized"))
+                {
+                    Some(max) => max,
+                    None => false,
+                };
+
+                if !window_maximized {
+                    let window_sz = match mem
+                        .data
+                        .get_temp::<Vec2>(Id::from("Window_size"))
+                    {
+                        Some(size) => size,
+                        None => Vec2::new(800., 450.),
+                    };
+                    let window_pos =
+                        match mem.data.get_temp::<Pos2>(Id::from("Window_pos"))
+                        {
+                            Some(pos) => pos,
+                            None => pos2(26., 26.),
+                        };
+
+                    frame.set_window_pos(window_pos);
+                    frame.set_window_size(window_sz);
+
+                    mem.data.remove::<Vec2>(Id::from("Window_size"));
+                    mem.data.remove::<Pos2>(Id::from("Window_pos"));
+                }
+
+                // frame.set_maximized(true);
+            });
+        }
+
         self.render_top_panel(ctx, frame);
         self.render_bottom_panel(ctx);
         self.render_central_panel(ctx);
