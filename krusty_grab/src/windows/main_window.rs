@@ -153,7 +153,7 @@ impl KrustyGrab {
                                 },
                             };
         
-                            ui.menu_button(screen_selected.to_string(), |ui| {
+                            ui.menu_button(RichText::new(screen_selected.to_string()).text_style(TextStyle::Body), |ui| {
                                 for i in 0..screens_number() {
                                     if ui.button(RichText::new((i+1).to_string()).text_style(TextStyle::Body)).clicked() {
                                         ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Selected_screen"), i));
@@ -163,7 +163,7 @@ impl KrustyGrab {
                             });
                         }
                         else {
-                            ui.label("1");
+                            ui.label(RichText::new("1").text_style(TextStyle::Body));
                         }
                         ui.label("Screen");
                     }); 
