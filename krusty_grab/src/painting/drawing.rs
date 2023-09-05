@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use egui::{Context, Pos2, Stroke, Rect, Vec2, Rgba, Color32, Layout, Align, Button, Id, color_picker::{color_edit_button_rgba, Alpha}, DragValue, Ui, LayerId, Order, pos2, Align2, FontId, Widget, Window, Painter};
+use egui::{Context, Pos2, Stroke, Rect, Vec2, Rgba, Color32, Layout, Align, Button, Id, color_picker::{color_edit_button_rgba, Alpha}, DragValue, Ui, LayerId, Order, pos2, Align2, FontId, Widget, Window, Painter, CursorIcon};
 use egui_extras::RetainedImage;
 use serde::{Serialize, Deserialize};
 use crate::krustygrab::{self, KrustyGrab };
@@ -58,6 +58,7 @@ impl RedoList {
 
 impl KrustyGrab {
     const REDO_LIST_SIZE: usize = 10;
+    const BASE_TEXT_SIZE: f32 = 30.0;
 
     pub fn render_drawing_toolbar(&mut self, ctx: &Context, ui: &mut Ui, frame: &mut eframe::Frame) {
         let mut color = match ctx.memory(|mem| mem.data.get_temp::<Rgba>(Id::from("Color"))){
@@ -71,47 +72,67 @@ impl KrustyGrab {
         };
         
         ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-            
+            //Brush button
             if Button::image_and_text(icon_img("pencil", ctx), ICON_SIZE, "")
             .stroke(Stroke::new(1.0,
                 Color32::from_rgb(128, 106, 0)))
-                .ui(ui).clicked() {
+                .ui(ui)
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text_at_pointer("Brush")
+                .clicked() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Brush));
                 tracing::error!("Pencil selected");
             }
 
+            //Circle button
             if Button::image_and_text(icon_img("circle", ctx), ICON_SIZE, "")
             .stroke(Stroke::new(1.0,
                 Color32::from_rgb(128, 106, 0)))
-                .ui(ui).clicked() {
+                .ui(ui)
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text_at_pointer("Circle")
+                .clicked() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Circle));
                 tracing::error!("Circle selected");
             }
 
+            //Rectangle button
             if Button::image_and_text(icon_img("rect", ctx), ICON_SIZE, "")
             .stroke(Stroke::new(1.0,
                 Color32::from_rgb(128, 106, 0)))
-                .ui(ui).clicked() {
+                .ui(ui)
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text_at_pointer("Rectangle")
+                .clicked() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Rectangle));
                 tracing::error!("Rect selected");
             }
 
+            //Arrow button
             if Button::image_and_text(icon_img("arrow", ctx), ICON_SIZE, "")
             .stroke(Stroke::new(1.0,
                 Color32::from_rgb(128, 106, 0)))
-                .ui(ui).clicked() {
+                .ui(ui)
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text_at_pointer("Arrow")
+                .clicked() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Arrow));
                 tracing::error!("Arrow selected");
             }
 
+            //Text button
             if Button::image_and_text(icon_img("text", ctx), ICON_SIZE, "")
             .stroke(Stroke::new(1.0,
                 Color32::from_rgb(128, 106, 0)))
-                .ui(ui).clicked() {
+                .ui(ui)
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text_at_pointer("Text")
+                .clicked() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Text));
                 tracing::error!("Text selected");
             }
 
+            //Color picker rendering
             let color_picker = color_edit_button_rgba(ui, &mut color, Alpha::BlendOrAdditive);
                         
             if ctx.memory(|mem| mem.any_popup_open()) {
@@ -125,6 +146,7 @@ impl KrustyGrab {
                 tracing::error!("Color changed to {:?}", color);
             }
 
+            //Thickness of the tools
             ui.label("Thickness");
             if DragValue::new(&mut thickness)
                 .speed(0.1)
@@ -135,34 +157,40 @@ impl KrustyGrab {
                 tracing::error!("Thickness changed to {:?}", thickness);
             }
 
-            //TODO disabilitare tasto in caso di lista disegni vuota (controllo se vuota alla pressione già effettuato, manca solo parte estetica)
-            if Button::image_and_text(icon_img("undo", ctx), ICON_SIZE, "")
-            .stroke(Stroke::new(1.0,
-                Color32::from_rgb(128, 106, 0)))
-                .ui(ui).clicked() {
+            //Undo button
+            let render_undo = ctx.memory(|mem| {
+                match mem.data.get_temp::<Vec<DrawingType>>(Id::from("Drawing")) {
+                    Some(d) => !d.is_empty(),
+                    None => false,
+                }
+            });
+
+            if ui.add_enabled(render_undo, Button::image_and_text(icon_img("undo", ctx), ICON_SIZE, "")
+            .stroke(Stroke::new(1.0, Color32::from_rgb(128, 106, 0))))
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text_at_pointer("Undo")
+                .on_disabled_hover_text("No more drawings to undo")
+                .clicked() {
                 ctx.memory_mut(|mem| {
                     match mem.data.get_temp::<Vec<DrawingType>>(Id::from("Drawing")) {
                         Some(mut drawings) => {
-                            //Check if some drawing exists
-                            if !drawings.is_empty() {
-                                let last = drawings.pop().expect("Drawings list should contains at least one element at this point");
+                            let last = drawings.pop().expect("Drawings list should contains at least one element at this point");
 
-                                //Retrieve and update Redo list
-                                let redo_list = match mem.data.get_temp::<RedoList>(Id::from("Redo_list")){
-                                    Some(mut redo) => {
-                                        redo.push(last);
-                                        redo
-                                    },
-                                    None => {
-                                        let mut redo = RedoList::new(KrustyGrab::REDO_LIST_SIZE);
-                                        redo.push(last);
-                                        redo
-                                    },
-                                };
-                                
-                                mem.data.insert_temp(Id::from("Redo_list"), redo_list);
-                                mem.data.insert_temp(Id::from("Drawing"), drawings);
-                            }
+                            //Retrieve and update Redo list
+                            let redo_list = match mem.data.get_temp::<RedoList>(Id::from("Redo_list")){
+                                Some(mut redo) => {
+                                    redo.push(last);
+                                    redo
+                                },
+                                None => {
+                                    let mut redo = RedoList::new(KrustyGrab::REDO_LIST_SIZE);
+                                    redo.push(last);
+                                    redo
+                                },
+                            };
+                            
+                            mem.data.insert_temp(Id::from("Redo_list"), redo_list);
+                            mem.data.insert_temp(Id::from("Drawing"), drawings);
                         },
                         None => {},
                     };
@@ -170,29 +198,35 @@ impl KrustyGrab {
                 tracing::error!("Undo selected");
             }
 
-            //TODO disabilitare tasto in caso di lista redo vuota (controllo se vuota alla pressione già effettuato, manca solo parte estetica)
-            if Button::image_and_text(icon_img("redo", ctx), ICON_SIZE, "")
-            .stroke(Stroke::new(1.0,
-                Color32::from_rgb(128, 106, 0)))
-                .ui(ui).clicked() {
+            let render_redo = ctx.memory(|mem| {
+                match mem.data.get_temp::<RedoList>(Id::from("Redo_list")) {
+                    Some(d) => !d.is_empty(),
+                    None => false,
+                }
+            });
+
+            //Redo button
+            if ui.add_enabled(render_redo, Button::image_and_text(icon_img("redo", ctx), ICON_SIZE, "")
+            .stroke(Stroke::new(1.0, Color32::from_rgb(128, 106, 0))))
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text_at_pointer("Redo")
+                .on_disabled_hover_text("No more drawings to redo")
+                .clicked() {
                 ctx.memory_mut(|mem| {
                     match mem.data.get_temp::<RedoList>(Id::from("Redo_list")) {
-                        Some(mut redo) => {
-                            //Check if some drawing exists in redo list
-                            if !redo.is_empty() {
-                                let last = redo.pop().expect("Redo list should contains at least one element at this point");
-    
-                                //Retrieve and update drawings list
-                                match mem.data.get_temp::<Vec<DrawingType>>(Id::from("Drawing")) {
-                                    Some(mut d) => {
-                                        d.push(last);
-                                        mem.data.insert_temp(Id::from("Drawing"), d);
-                                    },
-                                    None => panic!("Drawings list should exists in memory at this point"),
-                                }
-                                
-                                mem.data.insert_temp(Id::from("Redo_list"), redo);
+                        Some(mut redo) => {            
+                            let last = redo.pop().expect("Redo list should contains at least one element at this point");
+
+                            //Retrieve and update drawings list
+                            match mem.data.get_temp::<Vec<DrawingType>>(Id::from("Drawing")) {
+                                Some(mut d) => {
+                                    d.push(last);
+                                    mem.data.insert_temp(Id::from("Drawing"), d);
+                                },
+                                None => panic!("Drawings list should exists in memory at this point"),
                             }
+                            
+                            mem.data.insert_temp(Id::from("Redo_list"), redo);
                         },
                         None => {},
                     };
@@ -200,10 +234,13 @@ impl KrustyGrab {
                 tracing::error!("Redo selected");
             }
 
+            //Select button
             if Button::image_and_text(icon_img("select", ctx), ICON_SIZE, "")
-            .stroke(Stroke::new(1.0,
-                Color32::from_rgb(128, 106, 0)))
-                .ui(ui).clicked() {
+                .stroke(Stroke::new(1.0,Color32::from_rgb(128, 106, 0)))
+                .ui(ui)
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text_at_pointer("Cut screenshot")
+                .clicked() {
                     
                 ctx.memory_mut(|mem| {
                     let window_maximized = frame.info().window_info.maximized;
@@ -232,7 +269,7 @@ impl KrustyGrab {
         });
     }
 
-
+    ///TODO dare una definizione
     pub fn render_drawing(&mut self, ctx: &Context, ui: &mut Ui) {
         let screen = RetainedImage::from_color_image("Screenshot", self.screen.clone().unwrap());
 
@@ -632,7 +669,8 @@ impl KrustyGrab {
         for d in &drawings {
             match d.clone() {
                 DrawingType::Brush { points, mut s, .. } => {
-                    // s.width /= (screen.width() as f32 / w); //TODO  mettere se si vuole scalare il tratto
+                    //Change the thickness of the strok according to the window size in order to obtain a static dimension among the visualization 
+                    s.width /= visualization_ratio;
                     for i in 1..points.len() {
                         let to_paint = [self.adjust_drawing_pos(ctx, points[i], true), self.adjust_drawing_pos(ctx, points[i-1], true)];
                         painter.line_segment(to_paint, s);
@@ -655,7 +693,8 @@ impl KrustyGrab {
                 DrawingType::Text { mut p , t , s} => {
                     p = self.adjust_drawing_pos(ctx, p, true);
                     //Regolazione del font in base alla dimensione della finestra di render
-                    let font_size = (15.0 + s.width) / 1.0; //visualization_ratio; //TODO vedere come rendere più funzionante la staticità del testo
+                    let font_size = (KrustyGrab::BASE_TEXT_SIZE * s.width) / visualization_ratio; //TODO vedere se possibile ottenere del testo che non balla con il resizing
+                    // println!("Size: {font_size:?}");
                     painter.text(p, Align2::LEFT_CENTER, t, FontId::new(font_size, egui::FontFamily::Proportional), s.color);
                 },
             }
@@ -689,7 +728,7 @@ impl KrustyGrab {
                 },
                 DrawingType::Text { p , t , s} => {
                     //Regolazione del font in base alla dimensione della finestra di render
-                    let font_size = (15.0 + s.width);
+                    let font_size = KrustyGrab::BASE_TEXT_SIZE * s.width;
                     painter.text(p, Align2::LEFT_CENTER, t, FontId::new(font_size, egui::FontFamily::Proportional), s.color);
                 },
             }

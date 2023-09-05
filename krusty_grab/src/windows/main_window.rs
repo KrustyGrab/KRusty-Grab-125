@@ -143,7 +143,6 @@ impl KrustyGrab {
                     });
 
                     //Screen selection
-                    //TODO aggiustare la posizione e la size
                     ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
                         if screens_number() != 1 {
                             let screen_selected: usize = 1 + match ctx.memory(|mem| mem.data.get_temp(Id::from("Selected_screen"))) {
