@@ -144,28 +144,30 @@ impl KrustyGrab {
 
                     //Screen selection
                     //TODO aggiustare la posizione e la size
-                    if screens_number() != 1 {
-                        let screen_selected: usize = 1 + match ctx.memory(|mem| mem.data.get_temp(Id::from("Selected_screen"))) {
-                            Some(s) => s,
-                            None => {
-                                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Selected_screen"), 0));
-                                0
-                            },
-                        };
-    
-                        ui.menu_button(screen_selected.to_string(), |ui| {
-                            for i in 0..screens_number() {
-                                if ui.button(RichText::new((i+1).to_string()).text_style(TextStyle::Body)).clicked() {
-                                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Selected_screen"), i));
-                                    ui.close_menu();
+                    ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
+                        if screens_number() != 1 {
+                            let screen_selected: usize = 1 + match ctx.memory(|mem| mem.data.get_temp(Id::from("Selected_screen"))) {
+                                Some(s) => s,
+                                None => {
+                                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Selected_screen"), 0));
+                                    0
+                                },
+                            };
+        
+                            ui.menu_button(screen_selected.to_string(), |ui| {
+                                for i in 0..screens_number() {
+                                    if ui.button(RichText::new((i+1).to_string()).text_style(TextStyle::Body)).clicked() {
+                                        ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Selected_screen"), i));
+                                        ui.close_menu();
+                                    }
                                 }
-                            }
-                        });
-                    }
-                    else {
-                        ui.label("1");
-                    }
-                    ui.label("Screen");
+                            });
+                        }
+                        else {
+                            ui.label("1");
+                        }
+                        ui.label("Screen");
+                    }); 
                 });
             });
             ui.add_space(3.);
