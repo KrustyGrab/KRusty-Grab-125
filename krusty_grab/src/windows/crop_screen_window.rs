@@ -119,7 +119,6 @@ impl KrustyGrab {
                 );
             }
 
-            //TODO sistemare la visualizzazione dei disegni durante il ritaglio e dopo in maniera corretta
             //Setting the visualization area and the screenshot as background
             painter.set_clip_rect(Rect::from_min_size(pos2(0.0, 0.0), window_size));
             painter.image(

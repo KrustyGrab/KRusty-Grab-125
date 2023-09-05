@@ -98,6 +98,11 @@ pub fn take_screen(screen_src: usize) -> Result<ColorImage, Error> {
     }
 }
 
+///Return the number of connected screens
+pub fn screens_number() -> usize {
+    Screen::all().expect("The screens should be retrieved").len()
+}
+
 pub fn save_image(image: ColorImage, save_options: SaveOptions) -> Result<(), Error> {
     //Formulazione temporanea per la conversione da ColorImage a Vec<u8> utilizzato per la conversione in ImageBuffer
     let pix: Vec<u8> = image

@@ -1,5 +1,5 @@
 use egui::{Context, TopBottomPanel, menu, RichText, TextStyle, Layout, Button, ColorImage, CentralPanel, Widget, Id, Vec2, Pos2, pos2};
-use crate::{krustygrab::{KrustyGrab, KrustyGrabConfig}, painting::icons::{icon_img, ICON_SIZE}, painting::drawing::DrawingType};
+use crate::{krustygrab::{KrustyGrab, KrustyGrabConfig}, painting::icons::{icon_img, ICON_SIZE}, painting::drawing::DrawingType, screenshot::screen_capture::screens_number};
 pub use crate::screenshot::screen_capture::take_screen;
 
 impl KrustyGrab {
@@ -126,6 +126,7 @@ impl KrustyGrab {
                         self.set_screenshot(ctx);
                     }
 
+                    //Timer selection
                     ui.menu_image_button(icon_img("timer", ctx), ICON_SIZE, |ui| {
                         if ui.button(RichText::new("5 seconds").text_style(TextStyle::Body)).clicked() {
                             ui.close_menu();
@@ -140,6 +141,26 @@ impl KrustyGrab {
                             ui.close_menu();
                         }
                     });
+
+                    //Screen selection
+                    //TODO aggiustare la posizione e la size
+                    let screen_selected: usize = 1 + match ctx.memory(|mem| mem.data.get_temp(Id::from("Selected_screen"))) {
+                        Some(s) => s,
+                        None => {
+                            ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Selected_screen"), 0));
+                            0
+                        },
+                    };
+
+                    ui.menu_button(screen_selected.to_string(), |ui| {
+                        for i in 0..screens_number() {
+                            if ui.button(RichText::new((i+1).to_string()).text_style(TextStyle::Body)).clicked() {
+                                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Selected_screen"), i));
+                                ui.close_menu();
+                            }
+                        }
+                    });
+                    ui.label("Screen");
                 });
             });
             ui.add_space(3.);
@@ -178,9 +199,12 @@ impl KrustyGrab {
 
     ///Used to take and set the screenshot to visualize. Used when screenshot button clicked and when select crop area is pressed while no screenshot was previously taken
     pub fn set_screenshot(&mut self, ctx: &Context) {
-        //TODO impostare la scelta dello schermo
         //TODO rimuovere la visualizzazione della finestra durante l'acquisizione
-        let im = take_screen(0).expect("Problem taking the screenshot");
+        let screen_selected: usize = match ctx.memory(|mem| mem.data.get_temp(Id::from("Selected_screen"))) {
+            Some(s) => s,
+            None => 0,
+        };
+        let im = take_screen(screen_selected).expect("Problem taking the screenshot");
 
         self.set_temp_image(Some(im));
         ctx.memory_mut(|mem| mem.data.remove::<Vec<DrawingType>>(Id::from("Drawing")));
