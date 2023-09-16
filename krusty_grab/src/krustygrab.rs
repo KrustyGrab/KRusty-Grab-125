@@ -1,3 +1,5 @@
+use std::path::{PathBuf, Path};
+
 use crate::painting::icons::{icon_img, ICON_SIZE};
 use eframe::{egui_glow::painter, App, CreationContext};
 use egui::{
@@ -10,6 +12,7 @@ use egui::{
 use egui_extras::RetainedImage;
 use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager};
 use keyboard_types::{Code, Modifiers};
+use native_dialog::FileDialog;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -17,6 +20,16 @@ pub enum Format {
     Jpeg,
     Png,
     Gif,
+}
+
+impl ToString for Format {
+    fn to_string(&self) -> String {
+        match self {
+            Format::Jpeg => "jpg".to_string(),
+            Format::Png => "png".to_string(),
+            Format::Gif => "gif".to_string(),
+        }
+    }
 }
 
 // #[derive(Serialize, Deserialize)]
@@ -28,7 +41,7 @@ pub enum Format {
 #[derive(Serialize, Deserialize)]
 pub struct KrustyGrabConfig {
     pub dark_mode: bool,
-    pub save_folder: String,
+    pub save_folder: PathBuf,
     pub save_format: Format,
     // hotkeys: HotKeys,
 }
@@ -37,7 +50,7 @@ impl Default for KrustyGrabConfig {
     fn default() -> Self {
         Self {
             dark_mode: true,
-            save_folder: String::new(),
+            save_folder: Path::new("~/Desktop").to_path_buf(),
             save_format: Format::Png,
         }
     }
@@ -45,11 +58,7 @@ impl Default for KrustyGrabConfig {
 
 impl KrustyGrabConfig {
     fn _new() -> Self {
-        Self {
-            dark_mode: true,
-            save_folder: String::new(),
-            save_format: Format::Png,
-        }
+        Default::default()
     }
 }
 
@@ -187,7 +196,19 @@ impl KrustyGrab {
                     // let prev_save = self.config.save_folder.clone();
                     // let mut new_save = String::new();
                     // ui.add(egui::TextEdit::singleline(&mut new_save).hint_text(prev_save));
-                    ui.text_edit_singleline(&mut self.config.save_folder);
+                    // ui.text_edit_singleline(&mut self.config.save_folder);
+                    if Button::image_and_text(icon_img("folder", ctx), ICON_SIZE, "")
+                        .ui(ui)
+                        .clicked() {
+                            if let Some(path) = FileDialog::new()
+                                .set_location(&self.config.save_folder)
+                                .show_open_single_dir()
+                                .expect("Unable to visualize the folder selector") {
+                                    self.config.save_folder = path.clone();
+                                }
+                        }
+                        
+                    ui.label(self.config.save_folder.to_str().expect("Default folder path should be convertible into str"));
                     ui.end_row();
 
                     // if text_input.lost_focus() && ui.input(|i| {i.key_pressed(egui::Key::Enter)}) {
@@ -202,7 +223,7 @@ impl KrustyGrab {
                     //         tracing::error!("App state saved");
                     //     }
                     // }
-                    tracing::error!("{}", &self.config.save_folder); //log
+                    tracing::error!("{}", &self.config.save_folder.to_str().unwrap()); //log
 
                     ui.label("Save format:");
                     egui::ComboBox::from_label("Format")
@@ -249,7 +270,7 @@ impl KrustyGrab {
                                 None,
                                 KrustyGrabConfig {
                                     dark_mode: self.config.dark_mode,
-                                    save_folder: self.config.save_folder.to_string(),
+                                    save_folder: self.config.save_folder.clone(),
                                     save_format: self.config.save_format.clone(),
                                 },
                             ) {
@@ -263,7 +284,7 @@ impl KrustyGrab {
                     // });
                     ui.end_row();
 
-                    tracing::error!("{}", &self.config.save_folder); //log
+                    tracing::error!("{}", &self.config.save_folder.to_str().unwrap()); //log
                     tracing::error!("{:?}", &self.config.save_format); //log
                 });
         });

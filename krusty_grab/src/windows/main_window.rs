@@ -1,6 +1,8 @@
 use egui::{Context, TopBottomPanel, menu, RichText, TextStyle, Layout, Button, ColorImage, CentralPanel, Widget, Id, Vec2, Pos2, pos2};
-use crate::{krustygrab::{KrustyGrab, KrustyGrabConfig}, painting::icons::{icon_img, ICON_SIZE}, painting::drawing::DrawingType, screenshot::screen_capture::screens_number};
+use image::open;
+use crate::{krustygrab::{KrustyGrab, KrustyGrabConfig}, painting::{icons::{icon_img, ICON_SIZE}, drawing::RedoList}, painting::drawing::DrawingType, screenshot::screen_capture::screens_number};
 pub use crate::screenshot::screen_capture::take_screen;
+use native_dialog::FileDialog;
 
 impl KrustyGrab {
     pub fn main_window(&mut self, ctx: &Context, frame: &mut eframe::Frame){
@@ -35,8 +37,6 @@ impl KrustyGrab {
                     mem.data.remove::<Vec2>(Id::from("Window_size"));
                     mem.data.remove::<Pos2>(Id::from("Window_pos"));
                 }
-
-                // frame.set_maximized(true);
             });
         }
 
@@ -51,10 +51,34 @@ impl KrustyGrab {
             ui.add_space(3.);
             menu::bar(ui, |ui| {
                 ui.menu_image_button(icon_img("gear", ctx), ICON_SIZE, |ui| {
+                    
+                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("SM_open"), true));
+
                     if ui
                         .button(RichText::new("📁 Open").text_style(TextStyle::Body))
                         .clicked()
-                    {}
+                    {
+                        if let Some(path) = FileDialog::new()
+                            .add_filter("PNG", &["png"])
+                            .add_filter("JPG", &["jpg"])
+                            .add_filter("GIF", &["gif"])
+                            .show_open_single_file()
+                            .expect("Unable to visualize the file selection window") {
+                                let open_image = open(path).expect("Unable to open the file");
+                                let open_image_vec = open_image.clone().as_mut_rgba8().unwrap().clone().into_vec();
+        
+                                let new_image = ColorImage::from_rgba_unmultiplied(
+                                    [open_image.width() as usize, open_image.height() as usize],
+                                    &open_image_vec
+                                );
+                                self.set_temp_image(Some(new_image));
+                                ctx.memory_mut(|mem| {
+                                    mem.data.remove::<RedoList>(Id::from("Redo_list"));
+                                    mem.data.remove::<Vec<DrawingType>>(Id::from("Drawing"));
+                                });
+                            }
+
+                    }
 
                     ui.menu_button(
                         RichText::new("🌙 Theme").text_style(TextStyle::Body),
@@ -69,7 +93,7 @@ impl KrustyGrab {
                                     None,
                                     KrustyGrabConfig {
                                         dark_mode: self.config.dark_mode,
-                                        save_folder: self.config.save_folder.to_string(),
+                                        save_folder: self.config.save_folder.clone(),
                                         save_format: self.config.save_format.clone(),
                                     },
                                 ) {
@@ -88,7 +112,7 @@ impl KrustyGrab {
                                     None,
                                     KrustyGrabConfig {
                                         dark_mode: self.config.dark_mode,
-                                        save_folder: self.config.save_folder.to_string(),
+                                        save_folder: self.config.save_folder.clone(),
                                         save_format: self.config.save_format.clone(),
                                     },
                                 ) {

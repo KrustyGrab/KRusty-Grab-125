@@ -1,18 +1,19 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, time::{Instant, SystemTime}, fmt::format};
 
 use egui::{Context, Pos2, Stroke, Rect, Vec2, Rgba, Color32, Layout, Align, Button, Id, color_picker::{color_edit_button_rgba, Alpha}, DragValue, Ui, LayerId, Order, pos2, Align2, FontId, Widget, Window, Painter, CursorIcon};
 use egui_extras::RetainedImage;
+use native_dialog::FileDialog;
 use serde::{Serialize, Deserialize};
-use crate::krustygrab::{self, KrustyGrab };
+use crate::{krustygrab::{self, KrustyGrab }, screenshot::screen_capture::save_image};
 use crate::painting::icons::{icon_img, ICON_SIZE};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 enum DrawingMode {
-    Brush = 0,
-    Rectangle = 1,
-    Circle = 2,
-    Arrow = 3,
-    Text = 4,
+    Brush,
+    Rectangle,
+    Circle,
+    Arrow,
+    Text,
 }
 
 #[derive(Clone, Debug)]
@@ -25,7 +26,7 @@ pub enum DrawingType {
 }
 
 #[derive(Clone)]
-struct RedoList {
+pub struct RedoList {
     drawings: VecDeque<DrawingType>,
     cap: usize,
 }
@@ -71,149 +72,95 @@ impl KrustyGrab {
             None => 1.0,
         };
         
-        let mut highlights = [false, false, false, false, false, false];
-        match ctx.memory(|mem| mem.data.get_temp::<DrawingMode>(Id::from("DrawingMode"))) {
-            Some(m) => {
-                highlights[5] = true;
-                highlights[m as usize] = true;
-            },
-            None => highlights[5] = false,
-        }
+        let drawing_mode = match ctx.memory_mut(|mem| mem.data.get_temp(Id::from("DrawingMode"))) {
+            Some(m) => m,
+            None => DrawingMode::Brush,    
+        };
 
         ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
             //Brush button
-            if highlights[5] == true && highlights[DrawingMode::Brush as usize] {
-                if Button::image_and_text(icon_img("pencil", ctx), ICON_SIZE, "")
+            let mut brush_button = Button::image_and_text(icon_img("pencil", ctx), ICON_SIZE, "")
                 .stroke(Stroke::new(1.0,
-                    Color32::from_rgb(128, 106, 0)))
-                    .ui(ui)
-                    .highlight()
-                    .on_hover_cursor(CursorIcon::PointingHand)
-                    .on_hover_text_at_pointer("Brush")
-                    .clicked() {
-                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Brush));
-                    tracing::error!("Pencil selected");
-                }
+                Color32::from_rgb(128, 106, 0)))
+                .ui(ui)
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text_at_pointer("Brush");
+
+            if drawing_mode == DrawingMode::Brush {
+                brush_button = brush_button.highlight();
             }
-            else {
-                if Button::image_and_text(icon_img("pencil", ctx), ICON_SIZE, "")
-                .stroke(Stroke::new(1.0,
-                    Color32::from_rgb(128, 106, 0)))
-                    .ui(ui)
-                    .on_hover_cursor(CursorIcon::PointingHand)
-                    .on_hover_text_at_pointer("Brush")
-                    .clicked() {
-                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Brush));
-                    tracing::error!("Pencil selected");
-                }
+
+            if brush_button.clicked() {
+                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Brush));
+                tracing::error!("Pencil selected");
             }
             
             //Circle button
-            if highlights[5] == true && highlights[DrawingMode::Circle as usize] {
-                if Button::image_and_text(icon_img("circle", ctx), ICON_SIZE, "")
+            let mut circle_button = Button::image_and_text(icon_img("circle", ctx), ICON_SIZE, "")
                 .stroke(Stroke::new(1.0,
-                    Color32::from_rgb(128, 106, 0)))
-                    .ui(ui)
-                    .highlight()
-                    .on_hover_cursor(CursorIcon::PointingHand)
-                    .on_hover_text_at_pointer("Circle")
-                    .clicked() {
-                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Circle));
-                    tracing::error!("Circle selected");
-                }
+                Color32::from_rgb(128, 106, 0)))
+                .ui(ui)
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text_at_pointer("Circle");
+
+            if drawing_mode == DrawingMode::Circle {
+                circle_button = circle_button.highlight();
             }
-            else {
-                if Button::image_and_text(icon_img("circle", ctx), ICON_SIZE, "")
-                .stroke(Stroke::new(1.0,
-                    Color32::from_rgb(128, 106, 0)))
-                    .ui(ui)
-                    .on_hover_cursor(CursorIcon::PointingHand)
-                    .on_hover_text_at_pointer("Circle")
-                    .clicked() {
-                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Circle));
-                    tracing::error!("Circle selected");
-                }
+
+            if circle_button.clicked() {
+                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Circle));
+                tracing::error!("Circle selected");
             }
 
             //Rectangle button
-            if highlights[5] == true && highlights[DrawingMode::Rectangle as usize] {
-                if Button::image_and_text(icon_img("rect", ctx), ICON_SIZE, "")
+            let mut rectangle_button = Button::image_and_text(icon_img("rect", ctx), ICON_SIZE, "")
                 .stroke(Stroke::new(1.0,
-                    Color32::from_rgb(128, 106, 0)))
-                    .ui(ui)
-                    .highlight()
-                    .on_hover_cursor(CursorIcon::PointingHand)
-                    .on_hover_text_at_pointer("Rectangle")
-                    .clicked() {
-                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Rectangle));
-                    tracing::error!("Rect selected");
-                }
+                Color32::from_rgb(128, 106, 0)))
+                .ui(ui)
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text_at_pointer("Rectangle");
+
+            if drawing_mode == DrawingMode::Rectangle {
+                rectangle_button = rectangle_button.highlight();
             }
-            else {
-                if Button::image_and_text(icon_img("rect", ctx), ICON_SIZE, "")
-                .stroke(Stroke::new(1.0,
-                    Color32::from_rgb(128, 106, 0)))
-                    .ui(ui)
-                    .on_hover_cursor(CursorIcon::PointingHand)
-                    .on_hover_text_at_pointer("Rectangle")
-                    .clicked() {
-                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Rectangle));
-                    tracing::error!("Rect selected");
-                }
+
+            if rectangle_button.clicked() {
+                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Rectangle));
+                tracing::error!("Rect selected");
             }
 
             //Arrow button
-            if highlights[5] == true && highlights[DrawingMode::Arrow as usize] {
-                if Button::image_and_text(icon_img("arrow", ctx), ICON_SIZE, "")
+            let mut arrow_button = Button::image_and_text(icon_img("arrow", ctx), ICON_SIZE, "")
                 .stroke(Stroke::new(1.0,
-                    Color32::from_rgb(128, 106, 0)))
-                    .ui(ui)
-                    .highlight()
-                    .on_hover_cursor(CursorIcon::PointingHand)
-                    .on_hover_text_at_pointer("Arrow")
-                    .clicked() {
-                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Arrow));
-                    tracing::error!("Arrow selected");
-                }
+                Color32::from_rgb(128, 106, 0)))
+                .ui(ui)
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text_at_pointer("Arrow");
+
+            if drawing_mode == DrawingMode::Arrow {
+                arrow_button = arrow_button.highlight();
             }
-            else {
-                if Button::image_and_text(icon_img("arrow", ctx), ICON_SIZE, "")
-                .stroke(Stroke::new(1.0,
-                    Color32::from_rgb(128, 106, 0)))
-                    .ui(ui)
-                    .on_hover_cursor(CursorIcon::PointingHand)
-                    .on_hover_text_at_pointer("Arrow")
-                    .clicked() {
-                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Arrow));
-                    tracing::error!("Arrow selected");
-                }
+
+            if arrow_button.clicked() {
+                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Arrow));
+                tracing::error!("Arrow selected");
             }
 
             //Text button
-            if highlights[5] == true && highlights[DrawingMode::Text as usize] {
-                if Button::image_and_text(icon_img("text", ctx), ICON_SIZE, "")
+            let mut text_button = Button::image_and_text(icon_img("text", ctx), ICON_SIZE, "")
                 .stroke(Stroke::new(1.0,
-                    Color32::from_rgb(128, 106, 0)))
-                    .ui(ui)
-                    .highlight()
-                    .on_hover_cursor(CursorIcon::PointingHand)
-                    .on_hover_text_at_pointer("Text")
-                    .clicked() {
-                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Text));
-                    tracing::error!("Text selected");
-                }
+                Color32::from_rgb(128, 106, 0)))
+                .ui(ui)
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text_at_pointer("Text");
+
+            if drawing_mode == DrawingMode::Text {
+                text_button = text_button.highlight();
             }
-            else {
-                if Button::image_and_text(icon_img("text", ctx), ICON_SIZE, "")
-                .stroke(Stroke::new(1.0,
-                    Color32::from_rgb(128, 106, 0)))
-                    .ui(ui)
-                    .on_hover_cursor(CursorIcon::PointingHand)
-                    .on_hover_text_at_pointer("Text")
-                    .clicked() {
-                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Text));
-                    tracing::error!("Text selected");
-                }
+
+            if text_button.clicked() {
+                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Text));
+                tracing::error!("Text selected");
             }
 
             //Color picker rendering
@@ -349,6 +296,44 @@ impl KrustyGrab {
                 }
                 tracing::error!("Select area button selected");
             }
+
+            //Save button
+            if Button::image_and_text(icon_img("save", ctx), ICON_SIZE, "")
+                .stroke(Stroke::new(1.0, Color32::from_rgb(128, 106, 0)))
+                .ui(ui)
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text_at_pointer("Save")
+                .clicked() {
+
+                let mut save_path = self.config.save_folder.clone();
+                save_path.push(format!("{}", chrono::Utc::now().format("%Y_%m_%d-%H_%M_%S")));      //TODO decidere il formato di salvataggio
+                save_path.set_extension(self.config.save_format.to_string());
+                
+                save_image(self.get_temp_image().expect("Image must be defined"), save_path).expect("Unable to save");
+                
+                tracing::error!("Save button selected");
+            }
+
+            //Sava as button
+            if Button::image_and_text(icon_img("save_as", ctx), ICON_SIZE, "")
+                .stroke(Stroke::new(1.0, Color32::from_rgb(128, 106, 0)))
+                .ui(ui)
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text_at_pointer("Save as")
+                .clicked() {
+
+                if let Some(path) = FileDialog::new()
+                    // .set_location(&self.config.save_folder)      //TODO decidere se si vuole forzare sempre la cartella di default oppure se lasciare l'ultima cartella visualizzata in fase di salvataggio
+                    .add_filter("PNG", &["png"])
+                    .add_filter("JPG", &["jpg"])
+                    .add_filter("GIF", &["gif"])
+                    .show_save_single_file()
+                    .expect("Unable to visualize the file selection window") {
+                        save_image(self.get_temp_image().expect("Image must be defined"), path).expect("Unable to save as");
+                    }
+
+                tracing::error!("Save as button selected");
+            }
             
         });
     }
@@ -414,12 +399,19 @@ impl KrustyGrab {
             Some(c) => c,
             None => false
         };
+        
+        let settings_menu_open = match ctx.memory(|mem| mem.data.get_temp::<bool>(Id::from("SM_open"))){
+            Some(c) => {
+                ctx.memory_mut(|mem| mem.data.remove::<bool>(Id::from("SM_open")));
+                c
+            },
+            None => false
+        };
 
         let drawing_mode = match ctx.memory_mut(|mem| mem.data.get_temp(Id::from("DrawingMode"))) {
             Some(m) => m,
             None => DrawingMode::Brush,    
         };
-
         
         //TEXT
         let te_window = match ctx.memory_mut(|mem| mem.data.get_temp(Id::from("TE_open"))) {
@@ -494,14 +486,14 @@ impl KrustyGrab {
             });
         }
 
-        match ctx.pointer_hover_pos()/* ctx.input(|i| i.pointer.hover_pos()) */ {
+        match ctx.pointer_hover_pos() {
             Some(mut mouse) => {
                 let hover_rect = match ctx.memory(|mem| mem.data.get_temp(Id::from("hover_rect"))){
                     Some(r) => r,
                     None => area,
                 };
 
-                if hover_rect.contains(mouse) && !color_picker_open {
+                if hover_rect.contains(mouse) && !color_picker_open && !settings_menu_open {
                     //Rescaling della posizione del mouse sulla dimensione completa dello screen in modo da mantenere la posizione fissa sulla tela
                     mouse = self.adjust_drawing_pos(ctx, mouse, false);
 
