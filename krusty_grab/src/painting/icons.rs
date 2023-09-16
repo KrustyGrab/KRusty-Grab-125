@@ -50,6 +50,18 @@ pub fn icon_img(name: &str, ctx: &Context) -> TextureId {
                 "timer",
                 include_bytes!("./images/timer.svg"),
                 egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "save" => RetainedImage::from_svg_bytes_with_size(
+                "save",
+                include_bytes!("./images/save.svg"),
+                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "save_as" => RetainedImage::from_svg_bytes_with_size(
+                "save_as",
+                include_bytes!("./images/save_as.svg"),
+                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "folder" => RetainedImage::from_svg_bytes_with_size(
+                "folder",
+                include_bytes!("./images/folder.svg"),
+                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
             _ => panic!("Invalid icon")
         },
         false => match name {
@@ -96,6 +108,18 @@ pub fn icon_img(name: &str, ctx: &Context) -> TextureId {
             "timer" => RetainedImage::from_svg_bytes_with_size(
                 "timer",
                 include_bytes!("./images/timer_light.svg"),
+                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "save" => RetainedImage::from_svg_bytes_with_size(
+                "save",
+                include_bytes!("./images/save_light.svg"),
+                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "save_as" => RetainedImage::from_svg_bytes_with_size(
+                "save_as",
+                include_bytes!("./images/save_as_light.svg"),
+                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "folder" => RetainedImage::from_svg_bytes_with_size(
+                "folder",
+                include_bytes!("./images/folder_light.svg"),
                 egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
             _ => panic!("Invalid icon")
         },
