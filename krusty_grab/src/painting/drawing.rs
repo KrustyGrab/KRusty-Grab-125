@@ -314,7 +314,7 @@ impl KrustyGrab {
                 tracing::error!("Save button selected");
             }
 
-            //Sava as button
+            //Save as button
             if Button::image_and_text(icon_img("save_as", ctx), ICON_SIZE, "")
                 .stroke(Stroke::new(1.0, Color32::from_rgb(128, 106, 0)))
                 .ui(ui)

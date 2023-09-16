@@ -1,8 +1,12 @@
+use std::borrow::Cow;
+
 use egui::{
     pos2, Button, CentralPanel, Color32, Context, CursorIcon, Id, LayerId, Layout, Painter, Pos2,
     Rect, Vec2,
 };
 use egui_extras::RetainedImage;
+use arboard::{Clipboard, ImageData};
+
 
 use crate::krustygrab::{GrabStatus, KrustyGrab, WindowStatus};
 
@@ -68,11 +72,17 @@ impl KrustyGrab {
                                 if ctx.input(|i| i.pointer.primary_clicked()) {
                                     if self.get_selected_area().is_some() {
                                         //Save the screen part inside the selected area.
-                                        self.set_definitive_image(Some(
-                                            self.get_temp_image()
-                                                .unwrap()
-                                                .region(&self.get_selected_area().unwrap(), None),
-                                        ));
+                                        let im = self.get_temp_image()
+                                            .unwrap()
+                                            .region(&self.get_selected_area().unwrap(), None);
+                                    
+                                        //TODO decidere se implementare la copia dei disegni e in che modo (due punti in cui si copia in clipboard)
+                                        let mut clipboard = Clipboard::new().expect("Unable to create clipboard");
+                                        if let Err(e) = clipboard.set_image(ImageData { width: im.width(), height: im.height(), bytes: Cow::from(im.as_raw().clone())}) {
+                                            tracing::error!("Unable to copy in the clipboard: {e:?}");
+                                        }
+                                        
+                                        self.set_definitive_image(Some(im));
                                     }
 
                                     ctx.memory_mut(|mem| {
@@ -375,18 +385,7 @@ impl KrustyGrab {
                         let size = sel.size();
                         let window_size = _frame.info().window_info.size;
 
-                        if new_center.x + size[0] / 2.0 > window_size[0] {
-                            new_center.x = window_size[0] - size[0] / 2.0;
-                        }
-                        if new_center.y + size[1] / 2.0 > window_size[1] {
-                            new_center.y = window_size[1] - size[1] / 2.0;
-                        }
-                        if new_center.x - size[0] / 2.0 < 0.0 {
-                            new_center.x = size[0] / 2.0;
-                        }
-                        if new_center.y - size[1] / 2.0 < 0.0 {
-                            new_center.y = size[1] / 2.0;
-                        }
+                        new_center = new_center.clamp((size / 2.).to_pos2(), (window_size.to_pos2() - pos2(size[0] / 2., size[1] / 2.)).to_pos2());
                     }
 
                     //Update the area withe the new center
@@ -415,33 +414,8 @@ impl KrustyGrab {
         let mut init_pos = start;
         let mut end_pos = end;
 
-        //Top - Left
-        if init_pos.x < 0.0 {
-            init_pos.x = 0.0;
-        }
-        if init_pos.y < 0.0 {
-            init_pos.y = 0.0;
-        }
-        if end_pos.x < 0.0 {
-            end_pos.x = 0.0;
-        }
-        if end_pos.y < 0.0 {
-            end_pos.y = 0.0;
-        }
-
-        //Bottom - Right
-        if init_pos.x > window_size.x {
-            init_pos.x = window_size.x;
-        }
-        if init_pos.y > window_size.y {
-            init_pos.y = window_size.y;
-        }
-        if end_pos.x > window_size.x {
-            end_pos.x = window_size.x;
-        }
-        if end_pos.y > window_size.y {
-            end_pos.y = window_size.y;
-        }
+        init_pos = init_pos.clamp(pos2(0., 0.), window_size.to_pos2());
+        end_pos = end_pos.clamp(pos2(0., 0.), window_size.to_pos2());
 
         //Status needed during area manipolation in order to set the right one when min and max positions gets inverted
         let mut grab_status = self.get_grab_status();

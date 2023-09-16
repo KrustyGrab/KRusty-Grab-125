@@ -1,8 +1,11 @@
+use std::borrow::Cow;
+
 use egui::{Context, TopBottomPanel, menu, RichText, TextStyle, Layout, Button, ColorImage, CentralPanel, Widget, Id, Vec2, Pos2, pos2};
 use image::open;
 use crate::{krustygrab::{KrustyGrab, KrustyGrabConfig}, painting::{icons::{icon_img, ICON_SIZE}, drawing::RedoList}, painting::drawing::DrawingType, screenshot::screen_capture::screens_number};
 pub use crate::screenshot::screen_capture::take_screen;
 use native_dialog::FileDialog;
+use arboard::{Clipboard, ImageData};
 
 impl KrustyGrab {
     pub fn main_window(&mut self, ctx: &Context, frame: &mut eframe::Frame){
@@ -236,7 +239,13 @@ impl KrustyGrab {
         };
         let im = take_screen(screen_selected).expect("Problem taking the screenshot");
 
-        self.set_temp_image(Some(im));
+        self.set_temp_image(Some(im.clone()));
+        
+        let mut clipboard = Clipboard::new().expect("Unable to create clipboard");
+        if let Err(e) = clipboard.set_image(ImageData { width: im.width(), height: im.height(), bytes: Cow::from(im.as_raw().clone())}) {
+            tracing::error!("Unable to copy in the clipboard: {e:?}");
+        }
+
         ctx.memory_mut(|mem| mem.data.remove::<Vec<DrawingType>>(Id::from("Drawing")));
     }
 }
