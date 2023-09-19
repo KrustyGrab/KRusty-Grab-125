@@ -207,8 +207,10 @@ impl KrustyGrab {
                                     self.config.save_folder = path.clone();
                                 }
                         }
-                        
+                    ui.shrink_width_to_current();
+                    ui.add_space(180.0);
                     ui.label(self.config.save_folder.to_str().expect("Default folder path should be convertible into str"));
+                    ui.add_space(5.0);
                     ui.end_row();
 
                     // if text_input.lost_focus() && ui.input(|i| {i.key_pressed(egui::Key::Enter)}) {
