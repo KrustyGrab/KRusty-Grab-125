@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
-use egui::{Context, TopBottomPanel, menu, RichText, TextStyle, Layout, Button, ColorImage, CentralPanel, Widget, Id, Vec2, Pos2, pos2};
+use egui::{Context, TopBottomPanel, menu, RichText, TextStyle, Layout, Button, ColorImage, CentralPanel, Widget, Id, Vec2, Pos2, pos2, CursorIcon, Rect};
 use image::open;
-use crate::{krustygrab::{KrustyGrab, KrustyGrabConfig}, painting::{icons::{icon_img, ICON_SIZE}, drawing::RedoList}, painting::drawing::DrawingType, screenshot::screen_capture::screens_number};
+use crate::{krustygrab::{KrustyGrab, KrustyGrabConfig, self}, painting::{icons::{icon_img, ICON_SIZE}, drawing::RedoList}, painting::drawing::DrawingType, screenshot::screen_capture::screens_number};
 pub use crate::screenshot::screen_capture::take_screen;
 use native_dialog::FileDialog;
 use arboard::{Clipboard, ImageData};
@@ -147,9 +147,43 @@ impl KrustyGrab {
                 ui.with_layout(Layout::right_to_left(egui::Align::Max), |ui| {
                     if Button::image_and_text(icon_img("camera", ctx), ICON_SIZE, "")
                         .ui(ui)
+                        .on_hover_cursor(CursorIcon::PointingHand)
+                        .on_hover_text_at_pointer("Take screenshot")
                         .clicked()
                     {
                         tracing::error!("Screen button clicked");
+                        self.set_screenshot(ctx);
+                    }
+
+                    //Select area screenshot
+                    if Button::image_and_text(icon_img("select", ctx), ICON_SIZE, "")
+                        .ui(ui)
+                        .on_hover_cursor(CursorIcon::PointingHand)
+                        .on_hover_text_at_pointer("Select area")
+                        .clicked()
+                    {
+                        tracing::error!("DragScreen button clicked");
+                        ctx.memory_mut(|mem| {
+                            let window_maximized = frame.info().window_info.maximized;
+                            println!("Window maximized? {window_maximized:?}");
+        
+                            if !window_maximized {
+                                let window_size = frame.info().window_info.size;
+                                let window_pos = frame.info().window_info.position.expect("Window position should be Some");
+                                
+                                mem.data.insert_temp(Id::from("Window_size"), window_size);
+                                mem.data.insert_temp(Id::from("Window_pos"), window_pos);
+                                println!("PRE Window size and pos: {window_size:?} - {window_pos:?}");
+                            }
+                            
+                            mem.data.insert_temp(Id::from("Window_maximized"), window_maximized);
+
+                            mem.data.remove::<Option<Rect>>(Id::from("Prev_area")); //??
+                            self.set_select_area(None);
+                        });
+        
+                        self.set_window_status(krustygrab::WindowStatus::Crop);
+        
                         self.set_screenshot(ctx);
                     }
 

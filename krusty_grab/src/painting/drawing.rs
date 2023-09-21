@@ -265,8 +265,8 @@ impl KrustyGrab {
                 tracing::error!("Redo selected");
             }
 
-            //Select button
-            if Button::image_and_text(icon_img("select", ctx), ICON_SIZE, "")
+            //Cut button
+            if Button::image_and_text(icon_img("cut", ctx), ICON_SIZE, "")
                 .stroke(Stroke::new(1.0,Color32::from_rgb(128, 106, 0)))
                 .ui(ui)
                 .on_hover_cursor(CursorIcon::PointingHand)
@@ -294,7 +294,7 @@ impl KrustyGrab {
                 if self.get_temp_image().is_none() {
                     self.set_screenshot(ctx);
                 }
-                tracing::error!("Select area button selected");
+                tracing::error!("Cut screenshot button selected");
             }
 
             //Save button

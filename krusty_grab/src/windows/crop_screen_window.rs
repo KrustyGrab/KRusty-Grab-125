@@ -54,8 +54,7 @@ impl KrustyGrab {
                     |ui| {
                         ui.with_layout(Layout::right_to_left(egui::Align::Min), |ui| {
                             let save = ui.add_sized([60., 20.], Button::new("Save"));
-                            let cancel =
-                                ui.add_sized([60., 20.], Button::new("Cancel").rounding(30.));
+                            let cancel = ui.add_sized([60., 20.], Button::new("Cancel"));
 
                             let mut pressed = false;
 

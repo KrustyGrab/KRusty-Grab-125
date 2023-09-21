@@ -46,6 +46,10 @@ pub fn icon_img(name: &str, ctx: &Context) -> TextureId {
                 "select",
                 include_bytes!("./images/select.svg"),
                 egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "cut" => RetainedImage::from_svg_bytes_with_size(
+                "cut",
+                include_bytes!("./images/cut.svg"),
+                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
             "timer" => RetainedImage::from_svg_bytes_with_size(
                 "timer",
                 include_bytes!("./images/timer.svg"),
@@ -104,6 +108,10 @@ pub fn icon_img(name: &str, ctx: &Context) -> TextureId {
             "select" => RetainedImage::from_svg_bytes_with_size(
                 "select",
                 include_bytes!("./images/select_light.svg"),
+                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "cut" => RetainedImage::from_svg_bytes_with_size(
+                "cut",
+                include_bytes!("./images/cut_light.svg"),
                 egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
             "timer" => RetainedImage::from_svg_bytes_with_size(
                 "timer",
