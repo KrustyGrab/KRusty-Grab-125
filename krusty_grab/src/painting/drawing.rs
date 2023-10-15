@@ -493,7 +493,9 @@ impl KrustyGrab {
                     None => area,
                 };
 
-                if hover_rect.contains(mouse) && !color_picker_open && !settings_menu_open {
+                //The interaction with the canvas is only sensed when color picker and settings menu are closed and when not interacting with the configuration window (when it is open)
+                if hover_rect.contains(mouse) && !color_picker_open && !settings_menu_open 
+                    && !(self.config_window && ctx.layer_id_at(mouse).unwrap_or(LayerId { order: Order::Background, id: Id::from("Configuration_check") }).order == Order::Middle) {
                     //Rescaling della posizione del mouse sulla dimensione completa dello screen in modo da mantenere la posizione fissa sulla tela
                     mouse = self.adjust_drawing_pos(ctx, mouse, false);
 
@@ -510,46 +512,41 @@ impl KrustyGrab {
                     }
 
                     if ctx.input(|i| i.pointer.primary_down()) {
-                        // tracing::error!("Pointer primary down");
+                        //If the interaction is no longer with the configuration window it is closed without saving the changed values
+                        if self.config_window {
+                            self.config_window = false;
+                        }
+
                         let mut p0 = match ctx.memory(|mem| mem.data.get_temp(Id::from("initial_pos"))) {
                             Some(p) => p,
                             None => {
                                 let mut starting_pos = ctx.input(|i| i.pointer.press_origin()).unwrap();
+
                                 //Resize della posizione iniziale (e di conseguenza di quella precedente)
                                 starting_pos = self.adjust_drawing_pos(ctx, starting_pos, false);
                                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("initial_pos"), starting_pos));
+                                
                                 starting_pos
                             }
                         };
-
-                        //Anteprime dei tratti disegnati durante il drag
+                        //Preview of the drawings drawn during the drag motion
                         match drawing_mode {
                             DrawingMode::Brush => {
-                                let prev = match ctx.memory(|mem| mem.data.get_temp::<Pos2>(Id::from("previous_pos"))) {
-                                    Some(p) => p,
-                                    None => p0,
-                                };
-
-                                match drawings.last() {
+                                match drawings.last_mut() {
                                     Some(d) => {
-                                        match d.clone() {
+                                        match d {
                                             DrawingType::Brush { points, s, end } => {
-                                                if !end {
-                                                    let mut ps = points.clone();
-                                                    drawings.pop();
-                                                    ps.push(mouse);
-                                                    drawings.push(DrawingType::Brush { points: ps, s: stroke, end: false });
+                                                if !*end {
+                                                    points.push(mouse);
                                                 }
                                                 else {
                                                     let mut ps = Vec::new();
-                                                    ps.push(prev);
                                                     ps.push(mouse);
                                                     drawings.push(DrawingType::Brush { points: ps, s: stroke, end: false });
                                                 }
                                             },
                                             _ => {
                                                 let mut ps = Vec::new();
-                                                ps.push(prev);
                                                 ps.push(mouse);
                                                 drawings.push(DrawingType::Brush { points: ps, s: stroke, end: false });
                                             },
@@ -557,7 +554,6 @@ impl KrustyGrab {
                                     },
                                     None => {
                                         let mut ps = Vec::new();
-                                        ps.push(prev);
                                         ps.push(mouse);
                                         drawings.push(DrawingType::Brush { points: ps, s: stroke, end: false });
                                     },
@@ -685,15 +681,15 @@ impl KrustyGrab {
                                     _ => {},
                                 }
                                 mem.data.insert_temp(Id::from("Drawing"), drawings.clone());
-                            }
 
-                            if drawing_mode == DrawingMode::Brush && !primary_up {
-                                //Rescaling della posizione del mouse sulla dimensione completa dello screen in modo da mantenere la posizione fissa sulla tela
-                                // mouse = self.adjust_drawing_pos(ctx, mouse, false);  //TODO controllare perchè inserendo questo rescale si ha un crash in caso di uscita dalla tela
-                                mem.data.insert_temp(Id::from("previous_pos"), mouse);
-                            }
-                            else {
-                                mem.data.remove::<Pos2>(Id::from("previous_pos"));
+                                if !primary_up {
+                                    //Rescaling della posizione del mouse sulla dimensione completa dello screen in modo da mantenere la posizione fissa sulla tela
+                                    // mouse = self.adjust_drawing_pos(ctx, mouse, false);  //TODO controllare perchè inserendo questo rescale si ha un crash in caso di uscita dalla tela
+                                    mem.data.insert_temp(Id::from("previous_pos"), mouse);
+                                }
+                                else {
+                                    mem.data.remove::<Pos2>(Id::from("previous_pos"));
+                                }
                             }
                             
                             mem.data.remove::<Pos2>(Id::from("initial_pos"));

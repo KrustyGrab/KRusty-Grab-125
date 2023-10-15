@@ -225,7 +225,6 @@ impl KrustyGrab {
                     //         tracing::error!("App state saved");
                     //     }
                     // }
-                    tracing::error!("{}", &self.config.save_folder.to_str().unwrap()); //log
 
                     ui.label("Save format:");
                     egui::ComboBox::from_label("Format")
@@ -286,8 +285,9 @@ impl KrustyGrab {
                     // });
                     ui.end_row();
 
-                    tracing::error!("{}", &self.config.save_folder.to_str().unwrap()); //log
-                    tracing::error!("{:?}", &self.config.save_format); //log
+                    // tracing::error!("{}", &self.config.save_folder.to_str().unwrap()); //log
+                    // tracing::error!("{}", &self.config.save_folder.to_str().unwrap()); //log
+                    // tracing::error!("{:?}", &self.config.save_format); //log
                 });
         });
     }
