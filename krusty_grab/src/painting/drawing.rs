@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, time::{Instant, SystemTime}, fmt::format};
+use std::{collections::VecDeque};
 
 use egui::{Context, Pos2, Stroke, Rect, Vec2, Rgba, Color32, Layout, Align, Button, Id, color_picker::{color_edit_button_rgba, Alpha}, DragValue, Ui, LayerId, Order, pos2, Align2, FontId, Widget, Window, Painter, CursorIcon};
 use egui_extras::RetainedImage;
@@ -28,16 +28,17 @@ pub enum DrawingType {
 #[derive(Clone)]
 pub struct RedoList {
     drawings: VecDeque<DrawingType>,
-    cap: usize,
+    capacity: usize,
 }
 
+#[allow(unused)]
 impl RedoList {
     fn new(capacity: usize) -> Self {
-        RedoList { drawings: VecDeque::<DrawingType>::with_capacity(capacity), cap: capacity }
+        RedoList { drawings: VecDeque::<DrawingType>::with_capacity(capacity), capacity }
     }
 
     fn push(&mut self, d: DrawingType) {
-        if self.drawings.len() >= self.cap {
+        if self.drawings.len() >= self.capacity {
            self.drawings.pop_front(); 
         }
         self.drawings.push_back(d);
@@ -47,8 +48,8 @@ impl RedoList {
         self.drawings.pop_back()
     }
 
-    fn len(&self) -> usize { 
-        self.cap
+    fn capacity(&self) -> usize { 
+        self.capacity
     }
 
     fn is_empty(&self) -> bool {
@@ -345,7 +346,7 @@ impl KrustyGrab {
         let mut painter = ctx.layer_painter(LayerId::new(Order::Background, Id::from("Painter")));
 
         let aspect_ratio = screen.width() as f32 / screen.height() as f32;
-        let mut w = ui.available_width();  
+        let mut w = ui.available_width();
         let mut h = w / aspect_ratio;
         if h > ui.available_height() {
             h = ui.available_height();
@@ -422,7 +423,7 @@ impl KrustyGrab {
         if drawing_mode != DrawingMode::Text {
             let last_was_text = match drawings.last() {
                 Some(last) => match last {
-                    DrawingType::Text { p, t, s } => true,
+                    DrawingType::Text { p: _p, t: _t, s: _s } => true,
                     _ => false,
                 },
                 None => false,
@@ -535,7 +536,7 @@ impl KrustyGrab {
                                 match drawings.last_mut() {
                                     Some(d) => {
                                         match d {
-                                            DrawingType::Brush { points, s, end } => {
+                                            DrawingType::Brush { points, s: _s, end } => {
                                                 if !*end {
                                                     points.push(mouse);
                                                 }
@@ -611,7 +612,7 @@ impl KrustyGrab {
                                     DrawingMode::Brush => {
                                         match drawings.last_mut() {
                                             Some(d) => match d {
-                                                DrawingType::Brush { points, s, end } => {
+                                                DrawingType::Brush { points, s: _s, end } => {
                                                     points.push(mouse);
                                                     *end = true;
                                                 },
@@ -640,6 +641,7 @@ impl KrustyGrab {
                                             (mouse.y, p0.y) = (p0.y, mouse.y);
                                         }
         
+                                        //TODO rivedere calcoli (non mi piace la visualizzazione)
                                         let radius = mouse.x - p0.x;
                                         let center = pos2(p0.x + (mouse.x - p0.x) / 2.0, p0.y + (mouse.y - p0.y) / 2.0);
                                         drawings.push(DrawingType::Circle { c: center, r: radius, s: stroke });

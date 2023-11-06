@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
-use egui::{Context, TopBottomPanel, menu, RichText, TextStyle, Layout, Button, ColorImage, CentralPanel, Widget, Id, Vec2, Pos2, pos2, CursorIcon, Rect};
+use egui::{Context, TopBottomPanel, menu, RichText, TextStyle, Layout, Button, ColorImage, CentralPanel, Widget, Id, Vec2, Pos2, pos2, CursorIcon};
 use image::open;
-use crate::{krustygrab::{KrustyGrab, KrustyGrabConfig, self}, painting::{icons::{icon_img, ICON_SIZE}, drawing::RedoList}, painting::drawing::DrawingType, screenshot::screen_capture::screens_number};
+use crate::{krustygrab::{KrustyGrab, self}, painting::{icons::{icon_img, ICON_SIZE}, drawing::RedoList}, painting::drawing::DrawingType, screenshot::screen_capture::screens_number};
 pub use crate::screenshot::screen_capture::take_screen;
 use native_dialog::FileDialog;
 use arboard::{Clipboard, ImageData};
@@ -34,11 +34,12 @@ impl KrustyGrab {
                             None => pos2(26., 26.),
                         };
 
-                    frame.set_window_pos(window_pos);
-                    frame.set_window_size(window_sz);
-
                     mem.data.remove::<Vec2>(Id::from("Window_size"));
                     mem.data.remove::<Pos2>(Id::from("Window_pos"));
+
+                    // frame.set_fullscreen(window_maximized);
+                    frame.set_window_pos(window_pos);
+                    frame.set_window_size(window_sz);
                 }
             });
         }
@@ -55,7 +56,7 @@ impl KrustyGrab {
             menu::bar(ui, |ui| {
                 ui.menu_image_button(icon_img("gear", ctx), ICON_SIZE, |ui| {
                     
-                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("SM_open"), true));
+                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("SM_open"), true)); //TODO dubbia utilità
 
                     if ui
                         .button(RichText::new("📁 Open").text_style(TextStyle::Body))
@@ -80,7 +81,6 @@ impl KrustyGrab {
                                     mem.data.remove::<Vec<DrawingType>>(Id::from("Drawing"));
                                 });
                             }
-
                     }
 
                     ui.menu_button(
@@ -94,11 +94,7 @@ impl KrustyGrab {
                                 if let Err(e) = confy::store(
                                     "krustygrab",
                                     None,
-                                    KrustyGrabConfig {
-                                        dark_mode: self.config.dark_mode,
-                                        save_folder: self.config.save_folder.clone(),
-                                        save_format: self.config.save_format.clone(),
-                                    },
+                                    self.config.clone(),
                                 ) {
                                     tracing::error!("Failed saving app state: {}", e);
                                 } else {
@@ -113,11 +109,7 @@ impl KrustyGrab {
                                 if let Err(e) = confy::store(
                                     "krustygrab",
                                     None,
-                                    KrustyGrabConfig {
-                                        dark_mode: self.config.dark_mode,
-                                        save_folder: self.config.save_folder.clone(),
-                                        save_format: self.config.save_format.clone(),
-                                    },
+                                    self.config.clone(),
                                 ) {
                                     tracing::error!("Failed saving app state: {}", e);
                                 } else {
@@ -177,9 +169,6 @@ impl KrustyGrab {
                             }
                             
                             mem.data.insert_temp(Id::from("Window_maximized"), window_maximized);
-
-                            mem.data.remove::<Option<Rect>>(Id::from("Prev_area")); //??
-                            self.set_select_area(None);
                         });
         
                         self.set_window_status(krustygrab::WindowStatus::Crop);
@@ -206,18 +195,12 @@ impl KrustyGrab {
                     //Screen selection
                     ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
                         if screens_number() != 1 {
-                            let screen_selected: usize = 1 + match ctx.memory(|mem| mem.data.get_temp(Id::from("Selected_screen"))) {
-                                Some(s) => s,
-                                None => {
-                                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Selected_screen"), 0));
-                                    0
-                                },
-                            };
+                            let screen_selected: usize = 1 + self.get_selected_screen();
         
                             ui.menu_button(RichText::new(screen_selected.to_string()).text_style(TextStyle::Body), |ui| {
-                                for i in 0..screens_number() {
+                                for i in 0..self.get_number_screens() {
                                     if ui.button(RichText::new((i+1).to_string()).text_style(TextStyle::Body)).clicked() {
-                                        ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Selected_screen"), i));
+                                        self.set_selected_screen(i);
                                         ui.close_menu();
                                     }
                                 }
@@ -237,13 +220,13 @@ impl KrustyGrab {
     fn render_central_panel(&mut self, ctx: &Context) {
         CentralPanel::default().show(ctx, |ui| {
             if let Some(screen) = &self.screen {
-                let texture: egui::TextureHandle =
+                let _texture: egui::TextureHandle =
                     ui.ctx()
                         .load_texture("my-screen", screen.clone(), Default::default());
-
+                    
                 // Show the image:
-                // ui.image(&texture, ui.available_size());
-
+                // ui.image(&_texture, ui.available_size());
+                
                 self.render_drawing(ctx, ui);
             }
         });
@@ -267,10 +250,7 @@ impl KrustyGrab {
     ///Used to take and set the screenshot to visualize. Used when screenshot button clicked and when select crop area is pressed while no screenshot was previously taken
     pub fn set_screenshot(&mut self, ctx: &Context) {
         //TODO rimuovere la visualizzazione della finestra durante l'acquisizione
-        let screen_selected: usize = match ctx.memory(|mem| mem.data.get_temp(Id::from("Selected_screen"))) {
-            Some(s) => s,
-            None => 0,
-        };
+        let screen_selected: usize = self.get_selected_screen();
         let im = take_screen(screen_selected).expect("Problem taking the screenshot");
 
         self.set_temp_image(Some(im.clone()));
@@ -280,6 +260,7 @@ impl KrustyGrab {
             tracing::error!("Unable to copy in the clipboard: {e:?}");
         }
 
+        self.set_select_area(None);
         ctx.memory_mut(|mem| mem.data.remove::<Vec<DrawingType>>(Id::from("Drawing")));
     }
 }

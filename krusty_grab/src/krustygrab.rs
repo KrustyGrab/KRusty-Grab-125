@@ -1,17 +1,13 @@
-use std::path::{PathBuf, Path};
+use std::{path::{PathBuf, Path}, time::Instant, io::Write};
 
 use crate::painting::icons::{icon_img, ICON_SIZE};
-use eframe::{egui_glow::painter, App, CreationContext};
+use eframe::{App, CreationContext};
 use egui::{
-    color_picker::{color_edit_button_rgba, Alpha},
-    emath, menu, pos2, Align, Align2, Button, CentralPanel, Color32, ColorImage, Context,
-    DragValue, FontId, Frame, Grid, Hyperlink, Id, Label, LayerId, Layout, Order, Pos2, Rect, Rgba,
-    RichText, Sense, Stroke, TextBuffer, TextStyle, TextureId, TopBottomPanel, Ui, Vec2, Visuals,
+    Button, ColorImage, Context, FontId, Grid, Layout, Rect,
+    RichText, TextStyle, Visuals,
     Widget, Window,
 };
-use egui_extras::RetainedImage;
-use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager};
-use keyboard_types::{Code, Modifiers};
+
 use native_dialog::FileDialog;
 use serde::{Deserialize, Serialize};
 
@@ -38,7 +34,7 @@ impl ToString for Format {
 //     screen: HotKey,
 // }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct KrustyGrabConfig {
     pub dark_mode: bool,
     pub save_folder: PathBuf,
@@ -92,6 +88,8 @@ pub struct KrustyGrab {
     window_status: WindowStatus,
     select: Option<Rect>,
     temp_image: Option<ColorImage>,
+    number_screens: usize,
+    selected_screen: usize,
     // paint: Painting,
 }
 
@@ -105,6 +103,8 @@ impl Default for KrustyGrab {
             window_status: WindowStatus::Main,
             select: None,
             temp_image: None,
+            number_screens: crate::screenshot::screen_capture::screens_number(),
+            selected_screen: 0,
         }
     }
 }
@@ -167,6 +167,12 @@ impl KrustyGrab {
     pub fn get_temp_image(&self) -> Option<ColorImage> {
         self.temp_image.clone()
     }
+    pub fn get_number_screens(&self) -> usize {
+        self.number_screens
+    }
+    pub fn get_selected_screen(&self) -> usize {
+        self.selected_screen
+    }
 
     pub fn set_grab_status(&mut self, new_status: GrabStatus) {
         self.grab_status = new_status;
@@ -183,6 +189,13 @@ impl KrustyGrab {
     }
     pub fn set_definitive_image(&mut self, new_image: Option<ColorImage>) {
         self.screen = new_image.clone();
+    }
+    pub fn set_selected_screen(&mut self, new_screen: usize) -> bool {
+        if new_screen < self.number_screens {
+            self.selected_screen = new_screen;
+            return true;
+        }
+        return false;
     }
 
     fn render_config(&mut self, ctx: &Context) {
@@ -261,6 +274,7 @@ impl KrustyGrab {
                             .button(RichText::new("Close").text_style(TextStyle::Body))
                             .clicked()
                         {
+                            self.config = confy::load("krustygrab", None).unwrap_or_default();
                             self.config_window = false;
                         } else if ui
                             .button(RichText::new("Apply").text_style(TextStyle::Body))
@@ -269,11 +283,7 @@ impl KrustyGrab {
                             if let Err(e) = confy::store(
                                 "krustygrab",
                                 None,
-                                KrustyGrabConfig {
-                                    dark_mode: self.config.dark_mode,
-                                    save_folder: self.config.save_folder.clone(),
-                                    save_format: self.config.save_format.clone(),
-                                },
+                                self.config.clone(),
                             ) {
                                 tracing::error!("Failed saving app state: {}", e);
                             } else {
@@ -295,6 +305,7 @@ impl KrustyGrab {
 
 impl App for KrustyGrab {
     fn update(&mut self, ctx: &Context, frame: &mut eframe::Frame) {
+        let i = Instant::now();
         if self.config.dark_mode {
             ctx.set_visuals(Visuals::dark());
         } else {
@@ -309,5 +320,9 @@ impl App for KrustyGrab {
             WindowStatus::Main => self.main_window(ctx, frame),
             WindowStatus::Crop => self.crop_screen_window(ctx, frame),
         }
+        
+        // Performance debug -> frame generation time
+        print!("\r{:?}      ", i.elapsed());
+        std::io::stdout().flush();
     }
 }

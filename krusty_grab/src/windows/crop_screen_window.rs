@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use egui::{
     pos2, Button, CentralPanel, Color32, Context, CursorIcon, Id, LayerId, Layout, Painter, Pos2,
-    Rect, Vec2,
+    Rect, Vec2, Order,
 };
 use egui_extras::RetainedImage;
 use arboard::{Clipboard, ImageData};
@@ -29,17 +29,6 @@ impl KrustyGrab {
                 self.get_temp_image().expect("Image must be defined"),
             );
 
-            ctx.memory_mut(|mem| {
-                if mem
-                    .data
-                    .get_temp::<Option<Rect>>(Id::from("Prev_area"))
-                    .is_none()
-                {
-                    mem.data
-                        .insert_temp(Id::from("Prev_area"), self.get_selected_area());
-                }
-            });
-
             //Changing cursor to selection one
             ctx.set_cursor_icon(CursorIcon::Crosshair);
 
@@ -47,7 +36,9 @@ impl KrustyGrab {
             //Buttons for confirming or cancelling area selection. Visibles only when no manipulation is ongoing
             let mut save_rect: Rect = Rect::NOTHING;
             let mut cancel_rect: Rect = Rect::NOTHING;
-            //TODO decidere forma e posizione pulsanti. Decidere se fare una funzione separata
+            
+            let mut pressed = false;
+
             if self.get_grab_status() == GrabStatus::None {
                 _ui.with_layer_id(
                     LayerId::new(egui::Order::Foreground, Id::from("Save")),
@@ -56,97 +47,92 @@ impl KrustyGrab {
                             let save = ui.add_sized([60., 20.], Button::new("Save"));
                             let cancel = ui.add_sized([60., 20.], Button::new("Cancel"));
 
-                            let mut pressed = false;
-
                             save_rect = save.rect;
                             cancel_rect = cancel.rect;
 
-                            //Save button
-                            if ctx.pointer_hover_pos().is_some()
-                                && save_rect.contains(ctx.pointer_hover_pos().unwrap())
-                            {
-                                ctx.set_cursor_icon(CursorIcon::PointingHand);
-                                save.highlight();
+                            let pointer_pos = ctx.pointer_hover_pos();
 
-                                if ctx.input(|i| i.pointer.primary_clicked()) {
-                                    if self.get_selected_area().is_some() {
-                                        //Save the screen part inside the selected area.
-                                        let im = self.get_temp_image()
-                                            .unwrap()
-                                            .region(&self.get_selected_area().unwrap(), None);
-                                    
-                                        //TODO decidere se implementare la copia dei disegni e in che modo (due punti in cui si copia in clipboard)
-                                        let mut clipboard = Clipboard::new().expect("Unable to create clipboard");
-                                        if let Err(e) = clipboard.set_image(ImageData { width: im.width(), height: im.height(), bytes: Cow::from(im.as_raw().clone())}) {
-                                            tracing::error!("Unable to copy in the clipboard: {e:?}");
-                                        }
+                            if pointer_pos.is_some(){
+                                //Save button
+                                if save_rect.contains(pointer_pos.unwrap())
+                                {
+                                    ctx.set_cursor_icon(CursorIcon::PointingHand);
+                                    save.highlight();
+    
+                                    if ctx.input(|i| i.pointer.primary_clicked()) {
+                                        if self.get_selected_area().is_some() {
+                                            //Save the screen part inside the selected area.
+                                            let im = self.get_temp_image()
+                                                .unwrap()
+                                                .region(&self.get_selected_area().unwrap(), None);
                                         
-                                        self.set_definitive_image(Some(im));
+                                            //TODO decidere se implementare la copia dei disegni e in che modo (due punti in cui si copia in clipboard)
+                                            let mut clipboard = Clipboard::new().expect("Unable to create clipboard");
+                                            if let Err(e) = clipboard.set_image(ImageData { width: im.width(), height: im.height(), bytes: Cow::from(im.as_raw().clone())}) {
+                                                tracing::error!("Unable to copy in the clipboard: {e:?}");
+                                            }
+                                            
+                                            self.set_definitive_image(Some(im));
+                                        }
+    
+                                        ctx.memory_mut(|mem| {
+                                            mem.data.insert_temp(Id::from("Prev_area"), self.get_selected_area());
+                                        });
+    
+                                        pressed = true;
                                     }
-
-                                    ctx.memory_mut(|mem| {
-                                        mem.data.remove::<Option<Rect>>(Id::from("Prev_area"))
-                                    });
-
-                                    pressed = true;
                                 }
-                            }
-                            //Cancel button
-                            else if ctx.pointer_hover_pos().is_some()
-                                && cancel_rect.contains(ctx.pointer_hover_pos().unwrap())
-                            {
-                                ctx.set_cursor_icon(CursorIcon::PointingHand);
-                                cancel.highlight();
+                                //Cancel button
+                                else if cancel_rect.contains(pointer_pos.unwrap())
+                                {
+                                    ctx.set_cursor_icon(CursorIcon::PointingHand);
+                                    cancel.highlight();
+    
+                                    if ctx.input(|i| i.pointer.primary_clicked()) {
+                                        let prev_area = ctx.memory_mut(|mem| {
+                                            mem
+                                                .data
+                                                .get_temp::<Option<Rect>>(Id::from("Prev_area"))
+                                        }).unwrap_or_else(|| {None});
 
-                                if ctx.input(|i| i.pointer.primary_clicked()) {
-                                    let prev_area = ctx.memory_mut(|mem| {
-                                        let p = match mem
-                                            .data
-                                            .get_temp::<Option<Rect>>(Id::from("Prev_area"))
-                                        {
-                                            Some(p) => p,
-                                            None => None,
-                                        };
-                                        mem.data.remove::<Option<Rect>>(Id::from("Prev_area"));
-                                        p
-                                    });
-
-                                    self.set_select_area(prev_area);
-
-                                    pressed = true;
+                                        self.set_select_area(prev_area);
+    
+                                        pressed = true;
+                                    }
                                 }
-                            }
-
-                            //Return to main window and reshape the window if any button pressed
-                            if pressed {
-                                self.set_window_status(WindowStatus::Main);
-
-                                _frame.set_fullscreen(false);
                             }
                         });
                     },
                 );
             }
 
-            //Setting the visualization area and the screenshot as background
-            painter.set_clip_rect(Rect::from_min_size(pos2(0.0, 0.0), window_size));
-            painter.image(
-                image.texture_id(ctx),
-                Rect::from_min_size(pos2(0.0, 0.0), window_size),
-                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
-            );
+            //Return to main window and reshape the window if any button pressed
+            if pressed {
+                self.set_window_status(WindowStatus::Main);
 
-            self.show_drawings_in_select(ctx, &painter);
-
-            //Show the selected area if present
-            self.show_selected_area(ctx, _frame, &mut painter);
-
-            if ctx.pointer_hover_pos().is_some()
-                && !(save_rect.contains(ctx.pointer_hover_pos().unwrap())
-                    || cancel_rect.contains(ctx.pointer_hover_pos().unwrap()))
-            {
-                self.select_area(ctx, _frame);
+                _frame.set_fullscreen(false);
+            }
+            else{
+                //Setting the visualization area and the screenshot as background
+                painter.set_clip_rect(Rect::from_min_size(pos2(0.0, 0.0), window_size));
+                painter.image(
+                    image.texture_id(ctx),
+                    Rect::from_min_size(pos2(0.0, 0.0), window_size),
+                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
+    
+                self.show_drawings_in_select(ctx, &painter); //TODO controllare efficienza
+    
+                //Show the selected area if present
+                self.show_selected_area(ctx, _frame, &mut painter);
+    
+                if ctx.pointer_hover_pos().is_some()
+                    && !(save_rect.contains(ctx.pointer_hover_pos().unwrap())
+                        || cancel_rect.contains(ctx.pointer_hover_pos().unwrap()))
+                {
+                    self.select_area(ctx, _frame);
+                }
             }
         });
     }
@@ -197,9 +183,6 @@ impl KrustyGrab {
         //Check if the area is Some, otherwise draw the background overlay on all the screen
         match self.get_selected_area() {
             Some(sel) => {
-                //Draw the points used for resizing
-                self.grabbable_corners(ctx, _frame, painter);
-
                 let min = sel.min;
                 let max = sel.max;
 
@@ -229,6 +212,9 @@ impl KrustyGrab {
                     0.0,
                     KrustyGrab::OVERLAY_COLOR,
                 );
+                
+                //Draw the points used for resizing
+                self.grabbable_corners(ctx, _frame, painter);
             }
             None => painter.rect_filled(
                 //Draw the overlay on all the screen
@@ -268,6 +254,7 @@ impl KrustyGrab {
             //Handles are only drawn if the selection area is not being moved
             if grab_status != GrabStatus::Move {
                 //Draw the handles for resizing
+                painter.set_layer_id(LayerId::new(Order::Middle, Id::from("points_painter")));
                 painter.rect_filled(tl_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
                 painter.rect_filled(tr_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
                 painter.rect_filled(bl_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
@@ -410,11 +397,8 @@ impl KrustyGrab {
 
     ///Checks if the coordinates are inside the visualized window
     fn check_coordinates(&mut self, start: Pos2, end: Pos2, window_size: Vec2) -> (Pos2, Pos2) {
-        let mut init_pos = start;
-        let mut end_pos = end;
-
-        init_pos = init_pos.clamp(pos2(0., 0.), window_size.to_pos2());
-        end_pos = end_pos.clamp(pos2(0., 0.), window_size.to_pos2());
+        let mut init_pos = start.clamp(pos2(0., 0.), window_size.to_pos2());
+        let mut end_pos = end.clamp(pos2(0., 0.), window_size.to_pos2());
 
         //Status needed during area manipolation in order to set the right one when min and max positions gets inverted
         let mut grab_status = self.get_grab_status();
