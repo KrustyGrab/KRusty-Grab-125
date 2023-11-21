@@ -1,3 +1,4 @@
+#[allow(unused)]
 use std::{path::{PathBuf, Path}, time::Instant, io::Write};
 
 use crate::painting::icons::{icon_img, ICON_SIZE};
@@ -39,6 +40,7 @@ pub struct KrustyGrabConfig {
     pub dark_mode: bool,
     pub save_folder: PathBuf,
     pub save_format: Format,
+    pub screenshot_delay: usize,
     // hotkeys: HotKeys,
 }
 
@@ -48,6 +50,7 @@ impl Default for KrustyGrabConfig {
             dark_mode: true,
             save_folder: Path::new("~/Desktop").to_path_buf(),
             save_format: Format::Png,
+            screenshot_delay: 0,
         }
     }
 }
@@ -84,11 +87,11 @@ pub struct KrustyGrab {
     pub config: KrustyGrabConfig,
     pub config_window: bool,
     pub screen: Option<ColorImage>,
+    pub screenshot_requested: bool,
     grab_status: GrabStatus,
     window_status: WindowStatus,
     select: Option<Rect>,
     temp_image: Option<ColorImage>,
-    number_screens: usize,
     selected_screen: usize,
     // paint: Painting,
 }
@@ -103,8 +106,8 @@ impl Default for KrustyGrab {
             window_status: WindowStatus::Main,
             select: None,
             temp_image: None,
-            number_screens: crate::screenshot::screen_capture::screens_number(),
             selected_screen: 0,
+            screenshot_requested: false,
         }
     }
 }
@@ -167,9 +170,6 @@ impl KrustyGrab {
     pub fn get_temp_image(&self) -> Option<ColorImage> {
         self.temp_image.clone()
     }
-    pub fn get_number_screens(&self) -> usize {
-        self.number_screens
-    }
     pub fn get_selected_screen(&self) -> usize {
         self.selected_screen
     }
@@ -190,12 +190,15 @@ impl KrustyGrab {
     pub fn set_definitive_image(&mut self, new_image: Option<ColorImage>) {
         self.screen = new_image.clone();
     }
-    pub fn set_selected_screen(&mut self, new_screen: usize) -> bool {
-        if new_screen < self.number_screens {
-            self.selected_screen = new_screen;
-            return true;
+    pub fn set_selected_screen(&mut self, new_screen: usize){
+        self.selected_screen = new_screen;
+    }
+
+    pub fn is_window_status_crop(&self) -> bool {
+        match self.window_status {
+            WindowStatus::Crop => true,
+            _ => false
         }
-        return false;
     }
 
     fn render_config(&mut self, ctx: &Context) {
@@ -305,7 +308,7 @@ impl KrustyGrab {
 
 impl App for KrustyGrab {
     fn update(&mut self, ctx: &Context, frame: &mut eframe::Frame) {
-        let i = Instant::now();
+        // let i = Instant::now();      //TODO rimuovere dalla release
         if self.config.dark_mode {
             ctx.set_visuals(Visuals::dark());
         } else {
@@ -316,13 +319,20 @@ impl App for KrustyGrab {
             self.render_config(ctx);
         }
 
+        //Take the screenshot before turning on the visibility of the window
+        if self.screenshot_requested {
+            self.screenshot_requested = false;
+            self.set_screenshot(ctx);
+            frame.set_visible(true);
+        }
+
         match self.window_status {
             WindowStatus::Main => self.main_window(ctx, frame),
             WindowStatus::Crop => self.crop_screen_window(ctx, frame),
         }
-        
+
         // Performance debug -> frame generation time
-        print!("\r{:?}      ", i.elapsed());
-        std::io::stdout().flush();
+        // print!("\r{:?}      ", i.elapsed());
+        // std::io::stdout().flush();
     }
 }

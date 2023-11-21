@@ -10,7 +10,10 @@ use krustygrab::KrustyGrab;
 fn main() {
     tracing_subscriber::fmt::init();
     let mut win_options = NativeOptions::default();
+    
     win_options.initial_window_size = Some(Vec2::new(960., 540.));
+    win_options.min_window_size = Some(Vec2::new(859.0, 0.0));                  //Avoid toolbar overlapping
+
     run_native(
             "KrustyGrab", 
             win_options, 

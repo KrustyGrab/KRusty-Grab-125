@@ -1,6 +1,6 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, thread, time::Duration};
 
-use egui::{Context, TopBottomPanel, menu, RichText, TextStyle, Layout, Button, ColorImage, CentralPanel, Widget, Id, Vec2, Pos2, pos2, CursorIcon};
+use egui::{Context, TopBottomPanel, menu, RichText, TextStyle, Layout, Button, ColorImage, CentralPanel, Widget, Id, CursorIcon};
 use image::open;
 use crate::{krustygrab::{KrustyGrab, self}, painting::{icons::{icon_img, ICON_SIZE}, drawing::RedoList}, painting::drawing::DrawingType, screenshot::screen_capture::screens_number};
 pub use crate::screenshot::screen_capture::take_screen;
@@ -9,44 +9,17 @@ use arboard::{Clipboard, ImageData};
 
 impl KrustyGrab {
     pub fn main_window(&mut self, ctx: &Context, frame: &mut eframe::Frame){
-        if ctx.memory(|mem| mem.data.get_temp::<Vec2>(Id::from("Window_size")).is_some()) {
-            ctx.memory_mut(|mem| {
-                let window_maximized = match mem
-                    .data
-                    .get_temp::<bool>(Id::from("Window_maximized"))
-                {
-                    Some(max) => max,
-                    None => false,
-                };
-
-                if !window_maximized {
-                    let window_sz = match mem
-                        .data
-                        .get_temp::<Vec2>(Id::from("Window_size"))
-                    {
-                        Some(size) => size,
-                        None => Vec2::new(800., 450.),
-                    };
-                    let window_pos =
-                        match mem.data.get_temp::<Pos2>(Id::from("Window_pos"))
-                        {
-                            Some(pos) => pos,
-                            None => pos2(26., 26.),
-                        };
-
-                    mem.data.remove::<Vec2>(Id::from("Window_size"));
-                    mem.data.remove::<Pos2>(Id::from("Window_pos"));
-
-                    // frame.set_fullscreen(window_maximized);
-                    frame.set_window_pos(window_pos);
-                    frame.set_window_size(window_sz);
-                }
-            });
-        }
-
         self.render_top_panel(ctx, frame);
         self.render_bottom_panel(ctx);
         self.render_central_panel(ctx);
+
+        if self.is_window_status_crop() {
+            frame.set_fullscreen(true);
+        }
+
+        if self.screenshot_requested {
+            frame.set_visible(false);
+        }
     }
     
     fn render_top_panel(&mut self, ctx: &Context, frame: &mut eframe::Frame) {
@@ -126,7 +99,9 @@ impl KrustyGrab {
                         self.config_window = true;
                         ui.close_menu();
                     }
-                });
+                }).response
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text_at_pointer("Settings");
 
                 //painting commands
                 if self.screen.is_some() {
@@ -137,6 +112,7 @@ impl KrustyGrab {
 
                 //controls
                 ui.with_layout(Layout::right_to_left(egui::Align::Max), |ui| {
+                    // Take a screenshot
                     if Button::image_and_text(icon_img("camera", ctx), ICON_SIZE, "")
                         .ui(ui)
                         .on_hover_cursor(CursorIcon::PointingHand)
@@ -144,7 +120,7 @@ impl KrustyGrab {
                         .clicked()
                     {
                         tracing::error!("Screen button clicked");
-                        self.set_screenshot(ctx);
+                        self.screenshot_requested = true;
                     }
 
                     //Select area screenshot
@@ -155,42 +131,36 @@ impl KrustyGrab {
                         .clicked()
                     {
                         tracing::error!("DragScreen button clicked");
-                        ctx.memory_mut(|mem| {
-                            let window_maximized = frame.info().window_info.maximized;
-                            println!("Window maximized? {window_maximized:?}");
-        
-                            if !window_maximized {
-                                let window_size = frame.info().window_info.size;
-                                let window_pos = frame.info().window_info.position.expect("Window position should be Some");
-                                
-                                mem.data.insert_temp(Id::from("Window_size"), window_size);
-                                mem.data.insert_temp(Id::from("Window_pos"), window_pos);
-                                println!("PRE Window size and pos: {window_size:?} - {window_pos:?}");
-                            }
-                            
-                            mem.data.insert_temp(Id::from("Window_maximized"), window_maximized);
-                        });
         
                         self.set_window_status(krustygrab::WindowStatus::Crop);
-        
-                        self.set_screenshot(ctx);
+                        self.screenshot_requested = true;
                     }
 
                     //Timer selection
                     ui.menu_image_button(icon_img("timer", ctx), ICON_SIZE, |ui| {
+                        if ui.button(RichText::new("0 seconds").text_style(TextStyle::Body)).clicked() {
+                            self.config.screenshot_delay = 0;
+                            ui.close_menu();
+                        }
                         if ui.button(RichText::new("5 seconds").text_style(TextStyle::Body)).clicked() {
+                            self.config.screenshot_delay = 5;
                             ui.close_menu();
                         }
                         if ui.button(RichText::new("10 seconds").text_style(TextStyle::Body)).clicked() {
+                            self.config.screenshot_delay = 10;
                             ui.close_menu();
                         }
                         if ui.button(RichText::new("15 seconds").text_style(TextStyle::Body)).clicked() {
+                            self.config.screenshot_delay = 15;
                             ui.close_menu();
                         }
                         if ui.button(RichText::new("30 seconds").text_style(TextStyle::Body)).clicked() {
+                            self.config.screenshot_delay = 30;
                             ui.close_menu();
                         }
-                    });
+                    }).response
+                    .on_hover_cursor(CursorIcon::PointingHand)
+                    .on_hover_text_at_pointer("Screenshot delay");
 
                     //Screen selection
                     ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
@@ -198,13 +168,15 @@ impl KrustyGrab {
                             let screen_selected: usize = 1 + self.get_selected_screen();
         
                             ui.menu_button(RichText::new(screen_selected.to_string()).text_style(TextStyle::Body), |ui| {
-                                for i in 0..self.get_number_screens() {
+                                for i in 0..screens_number() {
                                     if ui.button(RichText::new((i+1).to_string()).text_style(TextStyle::Body)).clicked() {
                                         self.set_selected_screen(i);
                                         ui.close_menu();
                                     }
                                 }
-                            });
+                            }).response
+                            .on_hover_cursor(CursorIcon::PointingHand)
+                            .on_hover_text_at_pointer("Select screen");
                         }
                         else {
                             ui.label(RichText::new("1").text_style(TextStyle::Body));
@@ -219,14 +191,7 @@ impl KrustyGrab {
 
     fn render_central_panel(&mut self, ctx: &Context) {
         CentralPanel::default().show(ctx, |ui| {
-            if let Some(screen) = &self.screen {
-                let _texture: egui::TextureHandle =
-                    ui.ctx()
-                        .load_texture("my-screen", screen.clone(), Default::default());
-                    
-                // Show the image:
-                // ui.image(&_texture, ui.available_size());
-                
+            if self.screen.is_some() {                
                 self.render_drawing(ctx, ui);
             }
         });
@@ -247,14 +212,17 @@ impl KrustyGrab {
         });
     }
 
-    ///Used to take and set the screenshot to visualize. Used when screenshot button clicked and when select crop area is pressed while no screenshot was previously taken
+    ///Used to take and set the screenshot to visualize. Used when screenshot or select crop area buttons are pressed
     pub fn set_screenshot(&mut self, ctx: &Context) {
-        //TODO rimuovere la visualizzazione della finestra durante l'acquisizione
+        //Insert a delay in order to let the fade out animation of the application to be completed
+        thread::sleep(Duration::from_millis(125) + Duration::from_secs(self.config.screenshot_delay as u64));
+
         let screen_selected: usize = self.get_selected_screen();
         let im = take_screen(screen_selected).expect("Problem taking the screenshot");
 
         self.set_temp_image(Some(im.clone()));
         
+        //Copy the taken screenshot to the clipboard
         let mut clipboard = Clipboard::new().expect("Unable to create clipboard");
         if let Err(e) = clipboard.set_image(ImageData { width: im.width(), height: im.height(), bytes: Cow::from(im.as_raw().clone())}) {
             tracing::error!("Unable to copy in the clipboard: {e:?}");

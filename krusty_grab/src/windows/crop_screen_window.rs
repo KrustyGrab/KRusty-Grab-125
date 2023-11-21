@@ -17,10 +17,6 @@ impl KrustyGrab {
 
     ///Manage the visualization of the area selection.
     pub fn crop_screen_window(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
-        //Set the frame to fullscreen and enable the visibility
-        _frame.set_fullscreen(true);
-        _frame.set_visible(true);
-
         CentralPanel::default().show(ctx, |_ui| {
             let window_size = _frame.info().window_info.size;
             let mut painter = ctx.layer_painter(LayerId::background());
@@ -122,7 +118,7 @@ impl KrustyGrab {
                     Color32::WHITE,
                 );
     
-                self.show_drawings_in_select(ctx, &painter); //TODO controllare efficienza
+                self.show_drawings_in_select(ctx, &painter);
     
                 //Show the selected area if present
                 self.show_selected_area(ctx, _frame, &mut painter);
@@ -328,7 +324,7 @@ impl KrustyGrab {
         if ctx.input(|i| i.pointer.primary_down()) {
             match self.get_grab_status() {
                 GrabStatus::None => self.set_grab_status(status), //Set the passed status if enters with None
-                GrabStatus::Select => panic!("Should not be in Select mode during area updating"), //Unreachable code, should panic if reached
+                GrabStatus::Select => unreachable!("Should not be in Select mode during area updating"), //Unreachable code, should panic if reached
                 GrabStatus::TopLeft => new_min = pos,
                 GrabStatus::TopMid => new_min = pos2(sel.min.x, pos.y),
                 GrabStatus::TopRight => {
@@ -366,7 +362,7 @@ impl KrustyGrab {
                     //Updated center considering the pointer position
                     let mut new_center = pos2(pos.x - center_distance.x, pos.y - center_distance.y);
 
-                    //Check of the position of the new center in order to keep it inside the visualized window aka the screenshot area
+                    //Check if the position of the new center in order to keep it inside the visualized window aka the screenshot area
                     {
                         let size = sel.size();
                         let window_size = _frame.info().window_info.size;

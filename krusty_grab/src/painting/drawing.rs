@@ -62,7 +62,7 @@ impl KrustyGrab {
     const REDO_LIST_SIZE: usize = 10;
     const BASE_TEXT_SIZE: f32 = 30.0;
 
-    pub fn render_drawing_toolbar(&mut self, ctx: &Context, ui: &mut Ui, frame: &mut eframe::Frame) {
+    pub fn render_drawing_toolbar(&mut self, ctx: &Context, ui: &mut Ui, _frame: &mut eframe::Frame) {
         let mut color = match ctx.memory(|mem| mem.data.get_temp::<Rgba>(Id::from("Color"))){
             Some(c) => c,
             None => Rgba::from(Color32::GREEN)
@@ -165,7 +165,9 @@ impl KrustyGrab {
             }
 
             //Color picker rendering
-            let color_picker = color_edit_button_rgba(ui, &mut color, Alpha::BlendOrAdditive);
+            let color_picker = color_edit_button_rgba(ui, &mut color, Alpha::BlendOrAdditive)
+                                            .on_hover_cursor(CursorIcon::PointingHand)
+                                            .on_hover_text_at_pointer("Change color");
                         
             if ctx.memory(|mem| mem.any_popup_open()) {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("CP_open"), true));
@@ -184,6 +186,7 @@ impl KrustyGrab {
                 .speed(0.1)
                 .clamp_range(1.0..=10.0)
                 .ui(ui)
+                .on_hover_text_at_pointer("Change thickness")
                 .changed() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Thickness"), thickness));
                 tracing::error!("Thickness changed to {:?}", thickness);
@@ -273,28 +276,8 @@ impl KrustyGrab {
                 .on_hover_cursor(CursorIcon::PointingHand)
                 .on_hover_text_at_pointer("Cut screenshot")
                 .clicked() {
-                    
-                ctx.memory_mut(|mem| {
-                    let window_maximized = frame.info().window_info.maximized;
-                    println!("Window maximized? {window_maximized:?}");
-
-                    if !window_maximized {
-                        let window_size = frame.info().window_info.size;
-                        let window_pos = frame.info().window_info.position.expect("Window position should be Some");
-                        
-                        mem.data.insert_temp(Id::from("Window_size"), window_size);
-                        mem.data.insert_temp(Id::from("Window_pos"), window_pos);
-                        println!("PRE Window size and pos: {window_size:?} - {window_pos:?}");
-                    }
-                    
-                    mem.data.insert_temp(Id::from("Window_maximized"), window_maximized);
-                });
-
                 self.set_window_status(krustygrab::WindowStatus::Crop);
 
-                if self.get_temp_image().is_none() {
-                    self.set_screenshot(ctx);
-                }
                 tracing::error!("Cut screenshot button selected");
             }
 
@@ -576,15 +559,12 @@ impl KrustyGrab {
                                 tracing::error!("Painted rect with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
                             },
                             DrawingMode::Circle => {
-                                if mouse.x < p0.x {
-                                    (mouse.x, p0.x) = (p0.x, mouse.x);
-                                }
-                                if mouse.y < p0.y {
-                                    (mouse.y, p0.y) = (p0.y, mouse.y);
-                                }
-
-                                let radius = (mouse.x - p0.x) / visualization_ratio;
-                                let mut center = pos2(p0.x + (mouse.x - p0.x) / 2.0, p0.y + (mouse.y - p0.y) / 2.0);
+                                // Constructed fixing the center with the starting position and the radius is considered between the start and the cursor current position
+                                // let radius = mouse.distance(p0) / visualization_ratio;
+                                // let mut center =  p0;
+                                // Constructed with one side on the starting point and the opposite on the cursor
+                                let radius = mouse.distance(p0) / (visualization_ratio*2.0);
+                                let mut center =  p0 + Vec2::new((mouse.x-p0.x)/2.0, (mouse.y-p0.y)/2.0);
                                 center = self.adjust_drawing_pos(ctx, center, true);
 
                                 painter.circle_stroke(center, radius, stroke);
@@ -634,16 +614,13 @@ impl KrustyGrab {
                                         tracing::error!("Added rect with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
                                     },
                                     DrawingMode::Circle => {
-                                        if mouse.x < p0.x {
-                                            (mouse.x, p0.x) = (p0.x, mouse.x);
-                                        }
-                                        if mouse.y < p0.y {
-                                            (mouse.y, p0.y) = (p0.y, mouse.y);
-                                        }
-        
-                                        //TODO rivedere calcoli (non mi piace la visualizzazione)
-                                        let radius = mouse.x - p0.x;
-                                        let center = pos2(p0.x + (mouse.x - p0.x) / 2.0, p0.y + (mouse.y - p0.y) / 2.0);
+                                        // Constructed fixing the center with the starting position and the radius is considered between the start and the cursor current position
+                                        // let radius = mouse.distance(p0);
+                                        // let center = p0;
+                                        // Constructed with one side on the starting point and the opposite on the cursor
+                                        let radius = mouse.distance(p0) / 2.0;
+                                        let center =  p0 + Vec2::new((mouse.x-p0.x)/2.0, (mouse.y-p0.y)/2.0);
+
                                         drawings.push(DrawingType::Circle { c: center, r: radius, s: stroke });
                                         tracing::error!("Added circle with center {:?}, radius {:?}, stroke {:?}", center, radius, stroke);
                                     },
