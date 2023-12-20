@@ -1,6 +1,6 @@
-use std::{collections::VecDeque};
+use std::collections::VecDeque;
 
-use egui::{Context, Pos2, Stroke, Rect, Vec2, Rgba, Color32, Layout, Align, Button, Id, color_picker::{color_edit_button_rgba, Alpha}, DragValue, Ui, LayerId, Order, pos2, Align2, FontId, Widget, Window, Painter, CursorIcon};
+use egui::{Context, Pos2, Stroke, Rect, Vec2, Rgba, Color32, Layout, Align, Button, Id, color_picker::{color_edit_button_rgba, Alpha}, DragValue, Ui, LayerId, Order, pos2, Align2, FontId, Widget, Window, Painter, CursorIcon, RichText, TextStyle};
 use egui_extras::RetainedImage;
 use native_dialog::FileDialog;
 use serde::{Serialize, Deserialize};
@@ -11,7 +11,9 @@ use crate::painting::icons::{icon_img, ICON_SIZE};
 enum DrawingMode {
     Brush,
     Rectangle,
+    FilledRectangle,
     Circle,
+    FilledCircle, 
     Arrow,
     Text,
 }
@@ -20,7 +22,9 @@ enum DrawingMode {
 pub enum DrawingType {
     Brush {points: Vec<Pos2>, s: Stroke, end: bool},
     Rectangle {r: Rect, s: Stroke},
+    FilledRectangle {r: Rect, s: Stroke},
     Circle {c: Pos2, r: f32, s: Stroke},
+    FilledCircle {c: Pos2, r: f32, s: Stroke},
     Arrow {p: Pos2, v: Vec2, s: Stroke},
     Text {p: Pos2, t: String, s: Stroke}, //???
 }
@@ -93,41 +97,88 @@ impl KrustyGrab {
 
             if brush_button.clicked() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Brush));
-                tracing::error!("Pencil selected");
+                tracing::info!("Pencil selected");
             }
             
             //Circle button
-            let mut circle_button = Button::image_and_text(icon_img("circle", ctx), ICON_SIZE, "")
-                .stroke(Stroke::new(1.0,
-                Color32::from_rgb(128, 106, 0)))
-                .ui(ui)
-                .on_hover_cursor(CursorIcon::PointingHand)
-                .on_hover_text_at_pointer("Circle");
+            // let mut circle_button = Button::image_and_text(icon_img("circle", ctx), ICON_SIZE, "")
+            //     .stroke(Stroke::new(1.0,
+            //     Color32::from_rgb(128, 106, 0)))
+            //     .ui(ui)
+            //     .on_hover_cursor(CursorIcon::PointingHand)
+            //     .on_hover_text_at_pointer("Circle");
 
-            if drawing_mode == DrawingMode::Circle {
+            // if drawing_mode == DrawingMode::Circle {
+            //     circle_button = circle_button.highlight();
+            // }
+
+            // if circle_button.clicked() {
+            //     ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Circle));
+            //     tracing::info!("Circle selected");
+            // }
+
+            //[Circle|Filled Circle] button 
+            let mut name_icon =  "circle";
+            if drawing_mode == DrawingMode::FilledCircle {
+                name_icon = "circle_full";
+            }
+            let mut circle_button = ui.menu_image_button(icon_img(name_icon, ctx), ICON_SIZE, |ui| {
+                if ui
+                    .button(RichText::new("Circle").text_style(TextStyle::Body))
+                    .on_hover_text_at_pointer("Circle")
+                    .on_hover_cursor(CursorIcon::PointingHand)
+                    .clicked()
+                {
+                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Circle));
+                    tracing::info!("Circle selected");
+                    ui.close_menu();
+                }
+                if ui
+                .button(RichText::new("Circle Filled").text_style(TextStyle::Body))
+                .clicked()
+            {
+                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::FilledCircle));
+                tracing::info!("Circle Filled selected");
+                ui.close_menu();
+            }
+            
+            }).response;
+
+
+            if drawing_mode == DrawingMode::Circle || drawing_mode == DrawingMode::FilledCircle {
                 circle_button = circle_button.highlight();
             }
-
-            if circle_button.clicked() {
-                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Circle));
-                tracing::error!("Circle selected");
+            
+            //[Rectangle|Filled Rectangle] button
+            let mut name_icon =  "rect";
+            if drawing_mode == DrawingMode::FilledRectangle {
+                name_icon = "rect_full";
             }
 
-            //Rectangle button
-            let mut rectangle_button = Button::image_and_text(icon_img("rect", ctx), ICON_SIZE, "")
-                .stroke(Stroke::new(1.0,
-                Color32::from_rgb(128, 106, 0)))
-                .ui(ui)
+            let mut rectangle_button = ui.menu_image_button(icon_img(name_icon, ctx), ICON_SIZE, |ui| {
+                if ui
+                .button(RichText::new("Rectangle").text_style(TextStyle::Body))
+                .on_hover_text_at_pointer("Rectangle")
                 .on_hover_cursor(CursorIcon::PointingHand)
-                .on_hover_text_at_pointer("Rectangle");
+                .clicked()
+                {
+                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Rectangle));
+                    tracing::info!("Rectangle selected");
+                    ui.close_menu();
+                }
+                if ui
+                .button(RichText::new("Rectangle Filled").text_style(TextStyle::Body))
+                .clicked()
+                {
+                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::FilledRectangle));
+                    tracing::info!("Rectangle Filled selected");
+                    ui.close_menu();
+                }
 
-            if drawing_mode == DrawingMode::Rectangle {
+            }).response;
+
+            if drawing_mode == DrawingMode::Rectangle || drawing_mode == DrawingMode::FilledRectangle {
                 rectangle_button = rectangle_button.highlight();
-            }
-
-            if rectangle_button.clicked() {
-                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Rectangle));
-                tracing::error!("Rect selected");
             }
 
             //Arrow button
@@ -144,7 +195,7 @@ impl KrustyGrab {
 
             if arrow_button.clicked() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Arrow));
-                tracing::error!("Arrow selected");
+                tracing::info!("Arrow selected");
             }
 
             //Text button
@@ -161,7 +212,7 @@ impl KrustyGrab {
 
             if text_button.clicked() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Text));
-                tracing::error!("Text selected");
+                tracing::info!("Text selected");
             }
 
             //Color picker rendering
@@ -177,7 +228,7 @@ impl KrustyGrab {
             }
             if color_picker.changed() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Color"), color));
-                tracing::error!("Color changed to {:?}", color);
+                tracing::info!("Color changed to {:?}", color);
             }
 
             //Thickness of the tools
@@ -189,7 +240,7 @@ impl KrustyGrab {
                 .on_hover_text_at_pointer("Change thickness")
                 .changed() {
                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("Thickness"), thickness));
-                tracing::error!("Thickness changed to {:?}", thickness);
+                tracing::info!("Thickness changed to {:?}", thickness);
             }
 
             //Undo button
@@ -230,7 +281,7 @@ impl KrustyGrab {
                         None => {},
                     };
                 });
-                tracing::error!("Undo selected");
+                tracing::info!("Undo selected");
             }
 
             let render_redo = ctx.memory(|mem| {
@@ -266,7 +317,7 @@ impl KrustyGrab {
                         None => {},
                     };
                 });
-                tracing::error!("Redo selected");
+                tracing::info!("Redo selected");
             }
 
             //Cut button
@@ -278,7 +329,7 @@ impl KrustyGrab {
                 .clicked() {
                 self.set_window_status(krustygrab::WindowStatus::Crop);
 
-                tracing::error!("Cut screenshot button selected");
+                tracing::info!("Cut screenshot button selected");
             }
 
             //Save button
@@ -295,7 +346,7 @@ impl KrustyGrab {
                 
                 save_image(self.get_temp_image().expect("Image must be defined"), save_path).expect("Unable to save");
                 
-                tracing::error!("Save button selected");
+                tracing::info!("Save button selected");
             }
 
             //Save as button
@@ -316,7 +367,7 @@ impl KrustyGrab {
                         save_image(self.get_temp_image().expect("Image must be defined"), path).expect("Unable to save as");
                     }
 
-                tracing::error!("Save as button selected");
+                tracing::info!("Save as button selected");
             }
             
         });
@@ -367,13 +418,13 @@ impl KrustyGrab {
             Some(c) => c,
             None => Rgba::from(Color32::GREEN)
         };
-        // tracing::error!("Color from memory: {:?}", color);
+        // tracing::info!("Color from memory: {:?}", color);
 
         let thickness = match ctx.memory(|mem| mem.data.get_temp::<f32>(Id::from("Thickness"))){
             Some(t) => t,
             None => 1.0
         };
-        // tracing::error!("Thickness from memory: {}", thickness);
+        // tracing::info!("Thickness from memory: {}", thickness);
 
         let stroke = Stroke::new(thickness, color);
 
@@ -484,7 +535,7 @@ impl KrustyGrab {
                     mouse = self.adjust_drawing_pos(ctx, mouse, false);
 
                     if ctx.input(|i| i.pointer.primary_clicked()) && !te_window{
-                        // tracing::error!("Pointer primary clicked");
+                        // tracing::info!("Pointer primary clicked");
                         match drawing_mode {
                             DrawingMode::Text => {
                                 ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("TE_open"), true));
@@ -556,7 +607,18 @@ impl KrustyGrab {
                                 }
                                 let to_paint_border = Rect::from_min_max(self.adjust_drawing_pos(ctx, p0, true), self.adjust_drawing_pos(ctx, mouse, true));
                                 painter.rect_stroke(to_paint_border, 0.0, stroke);
-                                tracing::error!("Painted rect with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
+                                tracing::info!("Painted rect with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
+                            },
+                            DrawingMode::FilledRectangle => {
+                                if mouse.x < p0.x { //TODO possibile rimuovere un set di controllo di questo tipo dai rect, trovare quale (possibile anche per circle)
+                                    (mouse.x, p0.x) = (p0.x, mouse.x);
+                                }
+                                if mouse.y < p0.y {
+                                    (mouse.y, p0.y) = (p0.y, mouse.y);
+                                }
+                                let to_paint_border = Rect::from_min_max(self.adjust_drawing_pos(ctx, p0, true), self.adjust_drawing_pos(ctx, mouse, true));
+                                painter.rect_filled(to_paint_border, 0.0, stroke.color);
+                                tracing::info!("Painted fillrect with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
                             },
                             DrawingMode::Circle => {
                                 // Constructed fixing the center with the starting position and the radius is considered between the start and the cursor current position
@@ -568,13 +630,21 @@ impl KrustyGrab {
                                 center = self.adjust_drawing_pos(ctx, center, true);
 
                                 painter.circle_stroke(center, radius, stroke);
-                                tracing::error!("Painted circle with center {:?}, radius {:?}, stroke {:?}", center, radius, stroke);
+                                tracing::info!("Painted circle with center {:?}, radius {:?}, stroke {:?}", center, radius, stroke);
+                            },
+                            DrawingMode::FilledCircle => {
+                                let radius = mouse.distance(p0) / (visualization_ratio*2.0);
+                                let mut center =  p0 + Vec2::new((mouse.x-p0.x)/2.0, (mouse.y-p0.y)/2.0);
+                                center = self.adjust_drawing_pos(ctx, center, true);
+
+                                painter.circle_filled(center, radius, stroke.color);
+                                tracing::info!("Painted circle with center {:?}, radius {:?}, stroke {:?}", center, radius, stroke);
                             },
                             DrawingMode::Arrow => {
                                 let origin = self.adjust_drawing_pos(ctx, p0, true);
                                 let direction = Vec2::new(mouse.x - p0.x, mouse.y - p0.y) / visualization_ratio;
                                 painter.arrow(origin, direction, stroke);
-                                tracing::error!("Painted arrow with origin {:?}, vector {:?}, stroke {:?}", p0, Vec2::new(mouse.x - p0.x, mouse.y - p0.y), stroke);
+                                tracing::info!("Painted arrow with origin {:?}, vector {:?}, stroke {:?}", p0, Vec2::new(mouse.x - p0.x, mouse.y - p0.y), stroke);
                             },
                             _ => {},
                         }
@@ -585,7 +655,7 @@ impl KrustyGrab {
                     }
 
                     if ctx.input(|i| i.pointer.primary_released()) {
-                        // tracing::error!("Pointer primary released");
+                        // tracing::info!("Pointer primary released");
                         match ctx.memory(|mem| mem.data.get_temp::<Pos2>(Id::from("initial_pos"))) {
                             Some(mut p0) => {
                                 match drawing_mode {
@@ -611,7 +681,18 @@ impl KrustyGrab {
                                         }
         
                                         drawings.push(DrawingType::Rectangle { r: Rect::from_min_max(p0, mouse), s: stroke });
-                                        tracing::error!("Added rect with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
+                                        tracing::info!("Added rect with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
+                                    },
+                                    DrawingMode::FilledRectangle => {
+                                        if mouse.x < p0.x {
+                                            (mouse.x, p0.x) = (p0.x, mouse.x);
+                                        }
+                                        if mouse.y < p0.y {
+                                            (mouse.y, p0.y) = (p0.y, mouse.y);
+                                        }
+        
+                                        drawings.push(DrawingType::FilledRectangle { r: Rect::from_min_max(p0, mouse), s: stroke });
+                                        tracing::info!("Added rect with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
                                     },
                                     DrawingMode::Circle => {
                                         // Constructed fixing the center with the starting position and the radius is considered between the start and the cursor current position
@@ -622,11 +703,22 @@ impl KrustyGrab {
                                         let center =  p0 + Vec2::new((mouse.x-p0.x)/2.0, (mouse.y-p0.y)/2.0);
 
                                         drawings.push(DrawingType::Circle { c: center, r: radius, s: stroke });
-                                        tracing::error!("Added circle with center {:?}, radius {:?}, stroke {:?}", center, radius, stroke);
+                                        tracing::info!("Added circle with center {:?}, radius {:?}, stroke {:?}", center, radius, stroke);
+                                    },
+                                    DrawingMode::FilledCircle => {
+                                        // Constructed fixing the center with the starting position and the radius is considered between the start and the cursor current position
+                                        // let radius = mouse.distance(p0);
+                                        // let center = p0;
+                                        // Constructed with one side on the starting point and the opposite on the cursor
+                                        let radius = mouse.distance(p0) / 2.0;
+                                        let center =  p0 + Vec2::new((mouse.x-p0.x)/2.0, (mouse.y-p0.y)/2.0);
+
+                                        drawings.push(DrawingType::FilledCircle { c: center, r: radius, s: stroke });
+                                        tracing::info!("Added circle with center {:?}, radius {:?}, stroke {:?}", center, radius, stroke);
                                     },
                                     DrawingMode::Arrow => {
                                         drawings.push(DrawingType::Arrow { p: p0, v: Vec2::new(mouse.x - p0.x, mouse.y - p0.y), s: stroke });
-                                        tracing::error!("Added arrow with origin {:?}, vector {:?}, stroke {:?}", p0, Vec2::new(mouse.x - p0.x, mouse.y - p0.y), stroke);
+                                        tracing::info!("Added arrow with origin {:?}, vector {:?}, stroke {:?}", p0, Vec2::new(mouse.x - p0.x, mouse.y - p0.y), stroke);
                                     },
                                     _ => {},
                                 }
@@ -729,12 +821,21 @@ impl KrustyGrab {
                 },
                 DrawingType::Rectangle { r, s } => {
                     let to_paint = Rect::from_min_max(self.adjust_drawing_pos(ctx, r.min, true), self.adjust_drawing_pos(ctx, r.max, true));
-                    painter.rect(to_paint, 0.0, s.color, s);
+                    painter.rect_stroke(to_paint, 0.0, s);
+                },
+                DrawingType::FilledRectangle { r, s } => {
+                    let to_paint = Rect::from_min_max(self.adjust_drawing_pos(ctx, r.min, true), self.adjust_drawing_pos(ctx, r.max, true));
+                    painter.rect_filled(to_paint, 0.0, s.color);
                 },
                 DrawingType::Circle { mut c, mut r, s } => {
                     c = self.adjust_drawing_pos(ctx, c, true);
                     r /= visualization_ratio;
-                    painter.circle(c, r, s.color, s);
+                    painter.circle_stroke(c, r, s);
+                },
+                DrawingType::FilledCircle { mut c, mut r, s } => {
+                    c = self.adjust_drawing_pos(ctx, c, true);
+                    r /= visualization_ratio;
+                    painter.circle_filled(c, r, s.color);
                 },
                 DrawingType::Arrow { p, v, s } => {
                     let origin = self.adjust_drawing_pos(ctx, p, true);
@@ -769,9 +870,15 @@ impl KrustyGrab {
                     }
                 },
                 DrawingType::Rectangle { r, s } => {
-                    painter.rect(r, 0.0, s.color, s);
+                    painter.rect_stroke(r, 0.0, s);
+                },
+                DrawingType::FilledRectangle { r, s } => {
+                    painter.rect_filled(r, 0.0, s.color);
                 },
                 DrawingType::Circle { c, r, s } => {
+                    painter.circle(c, r, s.color, s);
+                },
+                DrawingType::FilledCircle { c, r, s } => {
                     painter.circle(c, r, s.color, s);
                 },
                 DrawingType::Arrow { p, v, s } => {

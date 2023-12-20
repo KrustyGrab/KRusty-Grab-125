@@ -14,14 +14,22 @@ pub fn icon_img(name: &str, ctx: &Context) -> TextureId {
                 "circle",
                 include_bytes!("./images/circle.svg"),
                 egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "circle_full" => RetainedImage::from_svg_bytes_with_size(
+                "circle_full",
+                include_bytes!("./images/circle_full.svg"),
+                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
             "rect" => RetainedImage::from_svg_bytes_with_size(
                 "rect",
                 include_bytes!("./images/rect.svg"),
                 egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "rect_full" => RetainedImage::from_svg_bytes_with_size(
+                "rect_full",
+                include_bytes!("./images/rect_full.svg"),
+                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),    
             "arrow" => RetainedImage::from_svg_bytes_with_size(
-                "arrow",
-                include_bytes!("./images/arrow.svg"),
-                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "arrow",
+            include_bytes!("./images/arrow.svg"),
+            egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
             "text" => RetainedImage::from_svg_bytes_with_size(
                 "text",
                 include_bytes!("./images/text.svg"),
