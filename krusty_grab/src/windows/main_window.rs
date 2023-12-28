@@ -53,6 +53,7 @@ impl KrustyGrab {
                                     mem.data.remove::<RedoList>(Id::from("Redo_list"));
                                     mem.data.remove::<Vec<DrawingType>>(Id::from("Drawing"));
                                 });
+                                ui.close_menu();
                             }
                     }
 
@@ -111,7 +112,7 @@ impl KrustyGrab {
                 }
 
                 //controls
-                ui.with_layout(Layout::right_to_left(egui::Align::Max), |ui| {
+                ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
                     // Take a screenshot
                     if Button::image_and_text(icon_img("camera", ctx), ICON_SIZE, "")
                         .ui(ui)
@@ -136,40 +137,53 @@ impl KrustyGrab {
                         self.screenshot_requested = true;
                     }
 
+                    // ui.horizontal(|ui| {
+                    let style = ui.style_mut();
+                    style.drag_value_text_style = egui::TextStyle::Body;
+                    ui.add(
+                        egui::DragValue::new(& mut self.config.screenshot_delay)
+                            .speed(1)
+                            .clamp_range(0..=120)
+                            .prefix("Timer: "),
+                    ).on_hover_text_at_pointer("Select timer");
+                    
+                    // });
+
+                    // OLD BUTTON TO REMOVE
                     //Timer selection
-                    ui.menu_image_button(icon_img("timer", ctx), ICON_SIZE, |ui| {
-                        if ui.button(RichText::new("0 seconds").text_style(TextStyle::Body)).clicked() {
-                            self.config.screenshot_delay = 0;
-                            ui.close_menu();
-                        }
-                        if ui.button(RichText::new("5 seconds").text_style(TextStyle::Body)).clicked() {
-                            self.config.screenshot_delay = 5;
-                            ui.close_menu();
-                        }
-                        if ui.button(RichText::new("10 seconds").text_style(TextStyle::Body)).clicked() {
-                            self.config.screenshot_delay = 10;
-                            ui.close_menu();
-                        }
-                        if ui.button(RichText::new("15 seconds").text_style(TextStyle::Body)).clicked() {
-                            self.config.screenshot_delay = 15;
-                            ui.close_menu();
-                        }
-                        if ui.button(RichText::new("30 seconds").text_style(TextStyle::Body)).clicked() {
-                            self.config.screenshot_delay = 30;
-                            ui.close_menu();
-                        }
-                    }).response
-                    .on_hover_cursor(CursorIcon::PointingHand)
-                    .on_hover_text_at_pointer("Screenshot delay");
+                    // ui.menu_image_button(icon_img("timer", ctx), ICON_SIZE, |ui| {
+                    //     if ui.button(RichText::new("0 seconds").text_style(TextStyle::Body)).clicked() {
+                    //         self.config.screenshot_delay = 0;
+                    //         ui.close_menu();
+                    //     }
+                    //     if ui.button(RichText::new("5 seconds").text_style(TextStyle::Body)).clicked() {
+                    //         self.config.screenshot_delay = 5;
+                    //         ui.close_menu();
+                    //     }
+                    //     if ui.button(RichText::new("10 seconds").text_style(TextStyle::Body)).clicked() {
+                    //         self.config.screenshot_delay = 10;
+                    //         ui.close_menu();
+                    //     }
+                    //     if ui.button(RichText::new("15 seconds").text_style(TextStyle::Body)).clicked() {
+                    //         self.config.screenshot_delay = 15;
+                    //         ui.close_menu();
+                    //     }
+                    //     if ui.button(RichText::new("30 seconds").text_style(TextStyle::Body)).clicked() {
+                    //         self.config.screenshot_delay = 30;
+                    //         ui.close_menu();
+                    //     }
+                    // }).response
+                    // .on_hover_cursor(CursorIcon::PointingHand)
+                    // .on_hover_text_at_pointer("Screenshot delay");
 
                     //Screen selection
-                    ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
+                    // ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
                         if screens_number() != 1 {
                             let screen_selected: usize = 1 + self.get_selected_screen();
         
-                            ui.menu_button(RichText::new(screen_selected.to_string()).text_style(TextStyle::Body), |ui| {
+                            ui.menu_button(RichText::new("Screen ".to_string() + screen_selected.to_string().as_str()).text_style(TextStyle::Body), |ui| {
                                 for i in 0..screens_number() {
-                                    if ui.button(RichText::new((i+1).to_string()).text_style(TextStyle::Body)).clicked() {
+                                    if ui.button(RichText::new("Screen ".to_string() + (i+1).to_string().as_str()).text_style(TextStyle::Body)).clicked() {
                                         self.set_selected_screen(i);
                                         ui.close_menu();
                                     }
@@ -181,8 +195,7 @@ impl KrustyGrab {
                         else {
                             ui.label(RichText::new("1").text_style(TextStyle::Body));
                         }
-                        ui.label("Screen");
-                    }); 
+                    // }); 
                 });
             });
             ui.add_space(3.);
