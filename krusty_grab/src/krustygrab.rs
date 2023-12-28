@@ -1,3 +1,4 @@
+use std::{iter::Map, collections::{HashMap, BTreeMap}, path::Display, arch::x86_64::__cpuid};
 #[allow(unused)]
 use std::{path::{PathBuf, Path}, time::Instant, io::Write};
 
@@ -6,11 +7,12 @@ use eframe::{App, CreationContext};
 use egui::{
     Button, ColorImage, Context, FontId, Grid, Layout, Rect,
     RichText, TextStyle, Visuals,
-    Widget, Window,
+    Widget, Window, TextEdit,
+    Key, Modifiers, Event, KeyboardShortcut, Sense, Align, Vec2,
 };
-
 use native_dialog::FileDialog;
 use serde::{Deserialize, Serialize};
+use egui_hotkey::{Hotkey, BindVariant};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum Format {
@@ -29,28 +31,67 @@ impl ToString for Format {
     }
 }
 
-// #[derive(Serialize, Deserialize)]
-// struct HotKeys {
-//     manager: GlobalHotKeyManager,
-//     screen: HotKey,
-// }
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MyHotKey{
+    pub modifier: Modifiers,
+    pub key: Option::<Key>,
 
-#[derive(Serialize, Deserialize, Clone)]
+}
+impl MyHotKey{
+    fn new(modifier: Modifiers, key: Key)-> Self{
+        if key == Key::Enter {
+            return Self{modifier, key: None};
+        }
+        Self{modifier, key: Some(key)}
+    }
+    fn humanprint(& self) -> String{
+        if self.modifier.is_none() {
+            return format!("{:?}", self.key).to_string();
+        }
+        let mut m = "";
+        if self.modifier.alt == true {
+            m = "ALT";
+        }
+        if self.modifier.ctrl == true {
+            m = "CTRL";
+        }
+        if self.modifier.command == true {
+            m = "CMD";
+        }
+        if self.modifier.mac_cmd == true {
+            m = "CMD";
+        }
+        if self.modifier.shift == true {
+            m = "SHIFT";
+        }
+        format!("{:?} + {:?}", m , self.key).to_string()
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct KrustyGrabConfig {
     pub dark_mode: bool,
     pub save_folder: PathBuf,
     pub save_format: Format,
     pub screenshot_delay: usize,
-    // hotkeys: HotKeys,
+    pub myhotkeys: BTreeMap<String, MyHotKey>,
 }
 
 impl Default for KrustyGrabConfig {
-    fn default() -> Self {
+    fn default() -> Self {  
+        let mut myhotkeys = BTreeMap::new();
+        let h1 = MyHotKey::new(Modifiers::NONE, Key::Enter); // Key::A);
+        let h2 = MyHotKey::new(Modifiers::NONE, Key::Enter); // Key::S);
+        let h3 = MyHotKey::new(Modifiers::NONE, Key::Enter); // Key::D);
+        myhotkeys.insert("Screen".to_string(), h1);
+        myhotkeys.insert("Screen Area".to_string(), h2);
+        myhotkeys.insert("Undo".to_string(), h3);
         Self {
             dark_mode: true,
             save_folder: Path::new("~/Desktop").to_path_buf(),
             save_format: Format::Png,
             screenshot_delay: 0,
+            myhotkeys,
         }
     }
 }
@@ -86,6 +127,7 @@ pub enum WindowStatus {
 pub struct KrustyGrab {
     pub config: KrustyGrabConfig,
     pub config_window: bool,
+    pub settingkey: bool, 
     pub screen: Option<ColorImage>,
     pub screenshot_requested: bool,
     grab_status: GrabStatus,
@@ -101,6 +143,7 @@ impl Default for KrustyGrab {
         Self {
             config: KrustyGrabConfig::_new(),
             config_window: false,
+            settingkey: false,
             screen: None,
             grab_status: GrabStatus::None,
             window_status: WindowStatus::Main,
@@ -268,9 +311,56 @@ impl KrustyGrab {
                             );
                         });
                     ui.end_row();
+                    ui.separator();
+                    ui.separator();
+                    ui.end_row();
+                    
+                    //Shortcuts configuration
+                    ui.label("Shortcuts:");
+                    ui.end_row();
+
+                    //for every possible shortcut
+                    for (shortcut_name , mut my_hotkey) in self.config.myhotkeys.clone(){
+                        ui.label(shortcut_name.clone() + ": ");
+
+                        let text_edit = TextEdit::singleline(&mut my_hotkey.humanprint()).ui(ui);
+
+                        if text_edit.has_focus(){
+                            // Disable the capture of hotkeys
+                            self.settingkey = true; 
+                            
+                            // Get the eventual new hotkey pressed
+                            my_hotkey = ctx.input(|i|{
+                                tracing::info!("Reading input for {}", shortcut_name ); 
+                                if i.keys_down.iter().nth(0).is_some(){
+                                    return MyHotKey::new(i.modifiers.clone(), i.keys_down.iter().nth(0).unwrap().clone());
+                                }
+                                my_hotkey
+                            });
+
+                            //Check that this combination is not present in any other hotkey 
+                            let my_hotkey_exists = self.config.myhotkeys.values().any(|combo| {
+                                combo.key == my_hotkey.key && combo.modifier == my_hotkey.modifier 
+                            });
+
+                            if !my_hotkey_exists {
+                                tracing::info!("New key for {:?} = {:?}", shortcut_name.clone(), my_hotkey.humanprint());
+                                // Save it locally
+                                self.config.myhotkeys.insert(shortcut_name.clone(), my_hotkey);
+                            }
+                            else {
+                                // ui.label("This hotkey is already used! Choose a different one");
+                                tracing::warn!("This hotkey is already used!");
+                            }
+                        }
+                        if text_edit.lost_focus(){
+                            self.settingkey = false; 
+                        }
+                        ui.end_row();
+                    }
 
                     ui.end_row();
-                    ui.separator();
+                    ui.separator(); // in the first col
                     // ui.horizontal(|ui| {
                     ui.with_layout(Layout::right_to_left(egui::Align::Min), |ui| {
                         if ui
@@ -288,9 +378,10 @@ impl KrustyGrab {
                                 None,
                                 self.config.clone(),
                             ) {
+                                println!("{:?}", self.config);
                                 tracing::error!("Failed saving app state: {}", e);
                             } else {
-                                tracing::error!("App state saved");
+                                tracing::info!("App state saved");
                             }
                             self.config_window = false;
                         }
@@ -302,6 +393,7 @@ impl KrustyGrab {
                     // tracing::error!("{}", &self.config.save_folder.to_str().unwrap()); //log
                     // tracing::error!("{:?}", &self.config.save_format); //log
                 });
+  
         });
     }
 }
@@ -329,6 +421,32 @@ impl App for KrustyGrab {
         match self.window_status {
             WindowStatus::Main => self.main_window(ctx, frame),
             WindowStatus::Crop => self.crop_screen_window(ctx, frame),
+        }
+    
+        //Handler for majour shortcuts
+        if !self.settingkey {
+            if let Some(hk) = ctx.input_mut(|x| {
+                for s in self.config.myhotkeys.iter().filter(|x|x.1.key.is_some()).clone() {
+                    let sh = KeyboardShortcut::new(s.1.modifier, s.1.key.unwrap());
+                    if x.consume_shortcut(&sh){
+                        return Some(s.clone());
+                    }
+                }
+                return None;
+            }){
+                tracing::info!("Shortcut pressed: {:?}", hk.0);
+                match hk.0.as_str() {
+                    "Undo" => tracing::info!("Still not supported"),
+                    "Screen" => {
+                        self.screenshot_requested = true;
+                    }
+                    "Screen Area" => {
+                        self.set_window_status(self::WindowStatus::Crop);
+                        self.screenshot_requested = true;
+                    },
+                    _ => tracing::error!("Unknown shortcut pressed")
+                }
+            }
         }
 
         // Performance debug -> frame generation time
