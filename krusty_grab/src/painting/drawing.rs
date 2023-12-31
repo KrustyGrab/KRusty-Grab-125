@@ -103,7 +103,7 @@ impl KrustyGrab {
             }
             
             // Highlighter button
-            let mut highlighter_button = Button::image_and_text(icon_img("pencil", ctx), ICON_SIZE, "")
+            let mut highlighter_button = Button::image_and_text(icon_img("highlighter", ctx), ICON_SIZE, "")
             .stroke(Stroke::new(1.0,
             Color32::from_rgb(128, 106, 0)))
             .ui(ui)
