@@ -27,6 +27,7 @@ impl KrustyGrab {
         TopBottomPanel::top("top panel").show(ctx, |ui| {
             ui.add_space(3.);
             menu::bar(ui, |ui| {
+                // Option menu
                 ui.menu_image_button(icon_img("gear", ctx), ICON_SIZE, |ui| {
                     
                     ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("SM_open"), true)); //TODO dubbia utilità
@@ -72,7 +73,7 @@ impl KrustyGrab {
                                 ) {
                                     tracing::error!("Failed saving app state: {}", e);
                                 } else {
-                                    tracing::error!("App state saved");
+                                    tracing::info!("App state saved");
                                 }
                             }
                             if ui
@@ -87,7 +88,7 @@ impl KrustyGrab {
                                 ) {
                                     tracing::error!("Failed saving app state: {}", e);
                                 } else {
-                                    tracing::error!("App state saved");
+                                    tracing::info!("App state saved");
                                 }
                             }
                         },
@@ -104,14 +105,12 @@ impl KrustyGrab {
                 .on_hover_cursor(CursorIcon::PointingHand)
                 .on_hover_text_at_pointer("Settings");
 
-                //painting commands
+                // Painting commands
                 if self.screen.is_some() {
-                    // tracing::error!("Painting buttons");
-
                     self.render_drawing_toolbar(ctx, ui, frame);
                 }
 
-                //controls
+                // Screen controls
                 ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
                     // Take a screenshot
                     if Button::image_and_text(icon_img("camera", ctx), ICON_SIZE, "")
@@ -120,7 +119,7 @@ impl KrustyGrab {
                         .on_hover_text_at_pointer("Take screenshot")
                         .clicked()
                     {
-                        tracing::error!("Screen button clicked");
+                        tracing::info!("Screen button clicked");
                         self.screenshot_requested = true;
                     }
 
@@ -131,7 +130,7 @@ impl KrustyGrab {
                         .on_hover_text_at_pointer("Select area")
                         .clicked()
                     {
-                        tracing::error!("DragScreen button clicked");
+                        tracing::info!("DragScreen button clicked");
         
                         self.set_window_status(krustygrab::WindowStatus::Crop);
                         self.screenshot_requested = true;
