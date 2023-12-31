@@ -8,7 +8,7 @@ use egui::{
     Button, ColorImage, Context, FontId, Grid, Layout, Rect,
     RichText, TextStyle, Visuals,
     Widget, Window, TextEdit,
-    Key, Modifiers, Event, KeyboardShortcut, Sense, Align, Vec2,
+    Key, Modifiers, Event, KeyboardShortcut, Sense, Align, Vec2, popup_below_widget,
 };
 use native_dialog::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -45,8 +45,11 @@ impl MyHotKey{
         Self{modifier, key: Some(key)}
     }
     fn humanprint(& self) -> String{
+        if self.key.is_none() {
+            return "Not registered".to_string();
+        }
         if self.modifier.is_none() {
-            return format!("{:?}", self.key).to_string();
+            return format!("{:?}", self.key.unwrap()).to_string();
         }
         let mut m = "";
         if self.modifier.alt == true {
@@ -64,7 +67,7 @@ impl MyHotKey{
         if self.modifier.shift == true {
             m = "SHIFT";
         }
-        format!("{:?} + {:?}", m , self.key).to_string()
+        format!("{:?} + {:?}", m , self.key.unwrap()).to_string()
     }
 }
 
@@ -325,37 +328,51 @@ impl KrustyGrab {
 
                         let text_edit = TextEdit::singleline(&mut my_hotkey.humanprint()).ui(ui);
 
+                        let popup_id = ui.make_persistent_id(format!("popup_overlapping {shortcut_name}"));
+                        popup_below_widget(ui, popup_id, &text_edit, |ui| {
+                            ui.label("You should provide a unique hotkey");
+                        });
+
                         if text_edit.has_focus(){
                             // Disable the capture of hotkeys
                             self.settingkey = true; 
                             
                             // Get the eventual new hotkey pressed
-                            my_hotkey = ctx.input(|i|{
-                                tracing::info!("Reading input for {}", shortcut_name ); 
+                            let changed = ctx.input(|i|{
+                                // tracing::info!("Reading input for {}", shortcut_name ); 
+                                let mut flag = false; 
                                 if i.keys_down.iter().nth(0).is_some(){
-                                    return MyHotKey::new(i.modifiers.clone(), i.keys_down.iter().nth(0).unwrap().clone());
+                                    let new_hotkey = MyHotKey::new(i.modifiers.clone(), i.keys_down.iter().nth(0).unwrap().clone());
+                                    flag = ! (new_hotkey.key == my_hotkey.key && new_hotkey.modifier == my_hotkey.modifier);
+                                    my_hotkey = new_hotkey;
                                 }
-                                my_hotkey
+                                return flag; 
                             });
 
-                            //Check that this combination is not present in any other hotkey 
-                            let my_hotkey_exists = self.config.myhotkeys.values().any(|combo| {
-                                combo.key == my_hotkey.key && combo.modifier == my_hotkey.modifier 
-                            });
+                            if changed {
+                                ui.memory_mut(|m| m.close_popup());
 
-                            if !my_hotkey_exists {
-                                tracing::info!("New key for {:?} = {:?}", shortcut_name.clone(), my_hotkey.humanprint());
-                                // Save it locally
-                                self.config.myhotkeys.insert(shortcut_name.clone(), my_hotkey);
-                            }
-                            else {
-                                // ui.label("This hotkey is already used! Choose a different one");
-                                tracing::warn!("This hotkey is already used!");
+                                //Check that this combination is not present in any other hotkey 
+                                let my_hotkey_exists = self.config.myhotkeys.values().any(|combo| {
+                                    combo.key == my_hotkey.key && combo.modifier == my_hotkey.modifier 
+                                });
+                                
+                                if !my_hotkey_exists {
+                                    tracing::info!("{:?} has a new hotkey ({:?})", shortcut_name.clone(), my_hotkey.humanprint());
+                                    // Save it locally
+                                    self.config.myhotkeys.insert(shortcut_name.clone(), my_hotkey);
+                                }
+                                else {
+                                    // ui.label("This hotkey is already used! Choose a different one");
+                                    tracing::warn!("This hotkey ({:?}) is already used!", my_hotkey.humanprint());
+                                    ui.memory_mut(|m| m.open_popup(popup_id));
+                                }
                             }
                         }
                         if text_edit.lost_focus(){
                             self.settingkey = false; 
-                        }
+                        } 
+
                         ui.end_row();
                     }
 
