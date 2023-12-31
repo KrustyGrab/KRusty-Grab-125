@@ -9,7 +9,7 @@ edition = "2021"
 anyhow = "1.0.75"
 arboard = "3.2.1"
 chrono = "0.4.31"
-confy = {version = "0.5.1", features = ["yaml_conf"], default-features = false }
+confy = {version = "0.5.1", features = ["yaml_conf"], default-features = false } #changed to yaml_conf to support enums (hotkey.modifier is an enum)
 eframe = "0.22.0"
 egui = {version = "0.22.0", features = ["persistence", "serde"]}
 egui_extras = {version="0.22.0", features = ["svg", "image"] }
