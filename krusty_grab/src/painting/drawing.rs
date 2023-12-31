@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, cmp::{min, max}};
 
 use egui::{Context, Pos2, Stroke, Rect, Vec2, Rgba, Color32, Layout, Align, Button, Id, color_picker::{color_edit_button_rgba, Alpha}, DragValue, Ui, LayerId, Order, pos2, Align2, FontId, Widget, Window, Painter, CursorIcon, RichText, TextStyle};
 use egui_extras::RetainedImage;
@@ -10,6 +10,7 @@ use crate::painting::icons::{icon_img, ICON_SIZE};
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 enum DrawingMode {
     Brush,
+    Highlighter, 
     Rectangle,
     FilledRectangle,
     Circle,
@@ -23,6 +24,7 @@ pub enum DrawingType {
     Brush {points: Vec<Pos2>, s: Stroke, end: bool},
     Rectangle {r: Rect, s: Stroke},
     FilledRectangle {r: Rect, s: Stroke},
+    Highlighter {r: Rect, s: Stroke},
     Circle {c: Pos2, r: f32, s: Stroke},
     FilledCircle {c: Pos2, r: f32, s: Stroke},
     Arrow {p: Pos2, v: Vec2, s: Stroke},
@@ -100,6 +102,24 @@ impl KrustyGrab {
                 tracing::info!("Pencil selected");
             }
             
+            // Highlighter button
+            let mut highlighter_button = Button::image_and_text(icon_img("pencil", ctx), ICON_SIZE, "")
+            .stroke(Stroke::new(1.0,
+            Color32::from_rgb(128, 106, 0)))
+            .ui(ui)
+            .on_hover_cursor(CursorIcon::PointingHand)
+            .on_hover_text_at_pointer("highlighter");
+
+            if drawing_mode == DrawingMode::Highlighter {
+                highlighter_button = highlighter_button.highlight();
+            }
+
+            if highlighter_button.clicked() {
+                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Highlighter));
+                tracing::info!("Highlighter selected");
+            }
+                        
+
             //Circle button
             // let mut circle_button = Button::image_and_text(icon_img("circle", ctx), ICON_SIZE, "")
             //     .stroke(Stroke::new(1.0,
@@ -609,6 +629,26 @@ impl KrustyGrab {
                                 painter.rect_stroke(to_paint_border, 0.0, stroke);
                                 tracing::info!("Painted rect with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
                             },
+                            DrawingMode::Highlighter => {
+                                // if mouse.x < p0.x { //TODO possibile rimuovere un set di controllo di questo tipo dai rect, trovare quale (possibile anche per circle)
+                                //     (mouse.x, p0.x) = (p0.x, mouse.x);
+                                // }
+                                // if mouse.y < p0.y {
+                                //     (mouse.y, p0.y) = (p0.y, mouse.y);
+                                // }                                     
+                                let mut minx = p0.x;
+                                let mut maxx = mouse.x;
+                                if mouse.x < p0.x {
+                                    (minx, maxx) = (maxx, minx);
+                                }
+                                let from_here = Pos2::new(minx , p0.y - stroke.width*5.);
+                                let to_there = Pos2::new(maxx , p0.y + stroke.width*5.);
+                                let mut color = stroke.color.clone();
+                                color[3] = color.a() / 3 ;
+                                let to_paint_border = Rect::from_min_max(self.adjust_drawing_pos(ctx, from_here, true), self.adjust_drawing_pos(ctx, to_there, true));
+                                painter.rect_filled(to_paint_border, 0.0, color );
+                                tracing::info!("Painted highlight with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
+                            },
                             DrawingMode::FilledRectangle => {
                                 if mouse.x < p0.x { //TODO possibile rimuovere un set di controllo di questo tipo dai rect, trovare quale (possibile anche per circle)
                                     (mouse.x, p0.x) = (p0.x, mouse.x);
@@ -671,6 +711,23 @@ impl KrustyGrab {
                                             _ => {},
                                         }
                                         ctx.memory_mut(|mem| mem.data.remove::<Pos2>(Id::from("previous_pos")));
+                                    },
+                                    DrawingMode::Highlighter => {
+                                        // if mouse.x < p0.x {
+                                        //     (mouse.x, p0.x) = (p0.x, mouse.x);
+                                        // }
+                                        // if mouse.y < p0.y {
+                                        //     (mouse.y, p0.y) = (p0.y, mouse.y);
+                                        // }
+                                        let mut minx = p0.x;
+                                        let mut maxx = mouse.x;
+                                        if mouse.x < p0.x {
+                                            (minx, maxx) = (maxx, minx);
+                                        }
+                                        let from_here = Pos2::new(minx , p0.y - stroke.width*5.);
+                                        let to_there = Pos2::new(maxx , p0.y + stroke.width*5.);
+                                        drawings.push(DrawingType::Highlighter{ r: Rect::from_min_max(from_here, to_there), s: stroke });
+                                        tracing::info!("Added highlight with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
                                     },
                                     DrawingMode::Rectangle => {
                                         if mouse.x < p0.x {
@@ -819,6 +876,12 @@ impl KrustyGrab {
                         painter.line_segment(to_paint, s);
                     }
                 },
+                DrawingType::Highlighter { r, s } => {
+                    let to_paint = Rect::from_min_max(self.adjust_drawing_pos(ctx, r.min, true), self.adjust_drawing_pos(ctx, r.max, true));
+                    let mut color = s.color.clone();
+                    color[3] = color.a() / 3 ;
+                    painter.rect_filled(to_paint, 0.0, color);
+                },
                 DrawingType::Rectangle { r, s } => {
                     let to_paint = Rect::from_min_max(self.adjust_drawing_pos(ctx, r.min, true), self.adjust_drawing_pos(ctx, r.max, true));
                     painter.rect_stroke(to_paint, 0.0, s);
@@ -868,6 +931,11 @@ impl KrustyGrab {
                         let to_paint = [points[i], points[i-1]];
                         painter.line_segment(to_paint, s);
                     }
+                },
+                DrawingType::Highlighter { r, s } => {
+                    let mut color = s.color.clone();
+                    color[3] = color.a() / 3 ;
+                    painter.rect_filled(r, 0.0, color);
                 },
                 DrawingType::Rectangle { r, s } => {
                     painter.rect_stroke(r, 0.0, s);
