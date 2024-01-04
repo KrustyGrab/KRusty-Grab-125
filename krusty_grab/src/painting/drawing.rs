@@ -39,18 +39,18 @@ pub struct RedoList {
 
 #[allow(unused)]
 impl RedoList {
-    fn new(capacity: usize) -> Self {
+    pub fn new(capacity: usize) -> Self {
         RedoList { drawings: VecDeque::<DrawingType>::with_capacity(capacity), capacity }
     }
 
-    fn push(&mut self, d: DrawingType) {
+    pub fn push(&mut self, d: DrawingType) {
         if self.drawings.len() >= self.capacity {
            self.drawings.pop_front(); 
         }
         self.drawings.push_back(d);
     }
 
-    fn pop(&mut self) -> Option<DrawingType> {
+    pub fn pop(&mut self) -> Option<DrawingType> {
         self.drawings.pop_back()
     }
 
@@ -58,15 +58,15 @@ impl RedoList {
         self.capacity
     }
 
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.drawings.is_empty()
     }
 }
 
 
 impl KrustyGrab {
-    const REDO_LIST_SIZE: usize = 10;
-    const BASE_TEXT_SIZE: f32 = 30.0;
+    pub const REDO_LIST_SIZE: usize = 10;
+    pub const BASE_TEXT_SIZE: f32 = 30.0;
 
     // Render the part of head toolbar for the drawing 
     pub fn render_drawing_toolbar(&mut self, ctx: &Context, ui: &mut Ui, _frame: &mut eframe::Frame) {

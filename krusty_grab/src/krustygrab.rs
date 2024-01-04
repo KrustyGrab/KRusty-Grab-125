@@ -2,13 +2,13 @@ use std::{iter::Map, collections::{HashMap, BTreeMap}, path::Display, arch::x86_
 #[allow(unused)]
 use std::{path::{PathBuf, Path}, time::Instant, io::Write};
 
-use crate::painting::icons::{icon_img, ICON_SIZE};
+use crate::painting::{icons::{icon_img, ICON_SIZE}, drawing::{DrawingType, RedoList}};
 use eframe::{App, CreationContext};
 use egui::{
     Button, ColorImage, Context, FontId, Grid, Layout, Rect,
     RichText, TextStyle, Visuals,
     Widget, Window, TextEdit,
-    Key, Modifiers, Event, KeyboardShortcut, Sense, Align, Vec2, popup_below_widget,
+    Key, Modifiers, Event, KeyboardShortcut, Sense, Align, Vec2, popup_below_widget, Id,
 };
 use native_dialog::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -83,12 +83,14 @@ pub struct KrustyGrabConfig {
 impl Default for KrustyGrabConfig {
     fn default() -> Self {  
         let mut myhotkeys = BTreeMap::new();
-        let h1 = MyHotKey::new(Modifiers::NONE, Key::Enter); // Key::A);
-        let h2 = MyHotKey::new(Modifiers::NONE, Key::Enter); // Key::S);
-        let h3 = MyHotKey::new(Modifiers::NONE, Key::Enter); // Key::D);
+        let h1 = MyHotKey::new(Modifiers::CTRL, Key::S); // Key::A);
+        let h2 = MyHotKey::new(Modifiers::CTRL, Key::A); // Key::S);
+        let h3 = MyHotKey::new(Modifiers::CTRL, Key::Z); // Key::D);
+        let h4 = MyHotKey::new(Modifiers::CTRL, Key::Y); // Key::D);
         myhotkeys.insert("Screen".to_string(), h1);
         myhotkeys.insert("Screen Area".to_string(), h2);
         myhotkeys.insert("Undo".to_string(), h3);
+        myhotkeys.insert("Redo".to_string(), h4);
         Self {
             dark_mode: true,
             save_folder: Path::new("~/Desktop").to_path_buf(),
@@ -453,7 +455,86 @@ impl App for KrustyGrab {
             }){
                 tracing::info!("Shortcut pressed: {:?}", hk.0);
                 match hk.0.as_str() {
-                    "Undo" => tracing::info!("Still not supported"),
+                    "Undo" => {
+
+                        if self.screen.is_some() {
+                            let do_undo = ctx.memory(|mem| {
+                                match mem.data.get_temp::<Vec<DrawingType>>(Id::from("Drawing")) {
+                                    Some(d) => !d.is_empty(),
+                                    None => false,
+                                }
+                            });
+                            if do_undo{
+
+                                
+                                tracing::info!("Undoing");
+                            ctx.memory_mut(|mem| {
+                                match mem.data.get_temp::<Vec<DrawingType>>(Id::from("Drawing")) {
+                                    Some(mut drawings) => {
+                                        let last = drawings.pop().expect("Drawings list should contains at least one element at this point");
+                                        
+                                        //Retrieve and update Redo list
+                                        let redo_list = match mem.data.get_temp::<RedoList>(Id::from("Redo_list")){
+                                            Some(mut redo) => {
+                                                redo.push(last);
+                                                redo
+                                            },
+                                            None => {
+                                                let mut redo = RedoList::new(Self::REDO_LIST_SIZE);
+                                                redo.push(last);
+                                                redo
+                                            },
+                                        };
+                                        
+                                        mem.data.insert_temp(Id::from("Redo_list"), redo_list);
+                                        mem.data.insert_temp(Id::from("Drawing"), drawings);
+                                    },
+                                    None => {},
+                                };
+                            });
+                        }else {
+                                tracing::info!("Nothing to undo");
+                        }
+                        }else {
+                            tracing::info!("You should do a screen before");
+                        }
+                    }
+                    "Redo" => {
+                        if self.screen.is_some() {
+                            let do_redo = ctx.memory(|mem| {
+                                match mem.data.get_temp::<RedoList>(Id::from("Redo_list")) {
+                                    Some(d) => !d.is_empty(),
+                                    None => false,
+                                }
+                            });
+                            if do_redo { 
+                                tracing::info!("Undoing");
+                                ctx.memory_mut(|mem| {
+                                    match mem.data.get_temp::<RedoList>(Id::from("Redo_list")) {
+                                        Some(mut redo) => {            
+                                            let last = redo.pop().expect("Redo list should contains at least one element at this point");
+            
+                                            //Retrieve and update drawings list
+                                            match mem.data.get_temp::<Vec<DrawingType>>(Id::from("Drawing")) {
+                                                Some(mut d) => {
+                                                    d.push(last);
+                                                    mem.data.insert_temp(Id::from("Drawing"), d);
+                                                },
+                                                None => panic!("Drawings list should exists in memory at this point"),
+                                            }
+                                            
+                                            mem.data.insert_temp(Id::from("Redo_list"), redo);
+                                        },
+                                        None => {},
+                                    };
+                                });                      
+                            } else {
+                                tracing::info!("Nothing to redo");
+                            }
+                        } else {
+                            tracing::info!("You should do a screen before");
+                        }
+                    }
                     "Screen" => {
                         self.screenshot_requested = true;
                     }
