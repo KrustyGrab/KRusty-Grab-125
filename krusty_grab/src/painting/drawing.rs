@@ -68,6 +68,7 @@ impl KrustyGrab {
     const REDO_LIST_SIZE: usize = 10;
     const BASE_TEXT_SIZE: f32 = 30.0;
 
+    // Render the part of head toolbar for the drawing 
     pub fn render_drawing_toolbar(&mut self, ctx: &Context, ui: &mut Ui, _frame: &mut eframe::Frame) {
         let mut color = match ctx.memory(|mem| mem.data.get_temp::<Rgba>(Id::from("Color"))){
             Some(c) => c,
@@ -119,24 +120,6 @@ impl KrustyGrab {
                 tracing::info!("Highlighter selected");
             }
                         
-
-            //Circle button
-            // let mut circle_button = Button::image_and_text(icon_img("circle", ctx), ICON_SIZE, "")
-            //     .stroke(Stroke::new(1.0,
-            //     Color32::from_rgb(128, 106, 0)))
-            //     .ui(ui)
-            //     .on_hover_cursor(CursorIcon::PointingHand)
-            //     .on_hover_text_at_pointer("Circle");
-
-            // if drawing_mode == DrawingMode::Circle {
-            //     circle_button = circle_button.highlight();
-            // }
-
-            // if circle_button.clicked() {
-            //     ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Circle));
-            //     tracing::info!("Circle selected");
-            // }
-
             //[Circle|Filled Circle] button 
             let mut name_icon =  "circle";
             if drawing_mode == DrawingMode::FilledCircle {
@@ -398,7 +381,7 @@ impl KrustyGrab {
         });
     }
 
-    ///TODO dare una definizione
+    /// Manage the canva
     pub fn render_drawing(&mut self, ctx: &Context, ui: &mut Ui) {
         let screen = RetainedImage::from_color_image("Screenshot", self.screen.clone().unwrap());
 
@@ -569,6 +552,7 @@ impl KrustyGrab {
                         }
                     }
 
+                    // sense clicking for drawing 
                     if ctx.input(|i| i.pointer.primary_down()) {
                         //If the interaction is no longer with the configuration window it is closed without saving the changed values
                         if self.config_window {
@@ -691,6 +675,7 @@ impl KrustyGrab {
                         });
                     }
 
+                    // save the drawing after relesing 
                     if ctx.input(|i| i.pointer.primary_released()) {
                         // tracing::info!("Pointer primary released");
                         match ctx.memory(|mem| mem.data.get_temp::<Pos2>(Id::from("initial_pos"))) {
