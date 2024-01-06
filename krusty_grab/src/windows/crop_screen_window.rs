@@ -12,13 +12,17 @@ use crate::krustygrab::{GrabStatus, KrustyGrab, WindowStatus};
 
 impl KrustyGrab {
     const OVERLAY_COLOR: Color32 = Color32::from_black_alpha(100);
-    const ADJUST_POINTS_COLOR: Color32 = Color32::from_rgb(100, 10, 10);
+    const ADJUST_POINTS_COLOR: Color32 = Color32::from_rgb(255, 255, 255);
+    const ADJUST_POINTS_ROUNDING: f32 = 9.0;
     const GRABBABLE_POINTS_SIZE: f32 = 10.0;
 
     ///Manage the visualization of the area selection.
-    pub fn crop_screen_window(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+    pub fn crop_screen_window(&mut self, ctx: &Context, frame: &mut eframe::Frame) {
+        if self.is_window_status_crop() {
+            frame.set_fullscreen(true);
+        }
         CentralPanel::default().show(ctx, |_ui| {
-            let window_size = _frame.info().window_info.size;
+            let window_size = frame.info().window_info.size;
             let mut painter = ctx.layer_painter(LayerId::background());
             let image = RetainedImage::from_color_image(
                 "Preview Image",
@@ -106,7 +110,7 @@ impl KrustyGrab {
             if pressed {
                 self.set_window_status(WindowStatus::Main);
 
-                _frame.set_fullscreen(false);
+                frame.set_fullscreen(false);
             }
             else{
                 //Setting the visualization area and the screenshot as background
@@ -121,20 +125,20 @@ impl KrustyGrab {
                 self.show_drawings_in_select(ctx, &painter);
     
                 //Show the selected area if present
-                self.show_selected_area(ctx, _frame, &mut painter);
+                self.show_selected_area(ctx, frame, &mut painter);
     
                 if ctx.pointer_hover_pos().is_some()
                     && !(save_rect.contains(ctx.pointer_hover_pos().unwrap())
                         || cancel_rect.contains(ctx.pointer_hover_pos().unwrap()))
                 {
-                    self.select_area(ctx, _frame);
+                    self.select_area(ctx, frame);
                 }
             }
         });
     }
 
     ///Check and set the coordinates of the selected area using drag and release.
-    fn select_area(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+    fn select_area(&mut self, ctx: &Context, frame: &mut eframe::Frame) {
         //Reset the status if the selection is ended
         if ctx.input(|i| i.pointer.primary_released())
             && self.get_grab_status() == GrabStatus::Select
@@ -161,7 +165,7 @@ impl KrustyGrab {
             //Update the saved area
             if init_pos != drag_pos {
                 (init_pos, drag_pos) =
-                    self.check_coordinates(init_pos, drag_pos, _frame.info().window_info.size);
+                    self.check_coordinates(init_pos, drag_pos, frame.info().window_info.size);
                 self.set_select_area(Some(Rect::from_min_max(init_pos, drag_pos)));
             }
         }
@@ -171,10 +175,10 @@ impl KrustyGrab {
     fn show_selected_area(
         &mut self,
         ctx: &Context,
-        _frame: &mut eframe::Frame,
+        frame: &mut eframe::Frame,
         painter: &mut Painter,
     ) {
-        let window_size = _frame.info().window_info.size;
+        let window_size = frame.info().window_info.size;
 
         //Check if the area is Some, otherwise draw the background overlay on all the screen
         match self.get_selected_area() {
@@ -210,7 +214,7 @@ impl KrustyGrab {
                 );
                 
                 //Draw the points used for resizing
-                self.grabbable_corners(ctx, _frame, painter);
+                self.grabbable_corners(ctx, frame, painter);
             }
             None => painter.rect_filled(
                 //Draw the overlay on all the screen
@@ -225,7 +229,7 @@ impl KrustyGrab {
     fn grabbable_corners(
         &mut self,
         ctx: &Context,
-        _frame: &mut eframe::Frame,
+        frame: &mut eframe::Frame,
         painter: &mut Painter,
     ) {
         let sel = self
@@ -251,15 +255,15 @@ impl KrustyGrab {
             if grab_status != GrabStatus::Move {
                 //Draw the handles for resizing
                 painter.set_layer_id(LayerId::new(Order::Middle, Id::from("points_painter")));
-                painter.rect_filled(tl_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
-                painter.rect_filled(tr_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
-                painter.rect_filled(bl_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
-                painter.rect_filled(br_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
+                painter.rect_filled(tl_point, KrustyGrab::ADJUST_POINTS_ROUNDING, KrustyGrab::ADJUST_POINTS_COLOR);
+                painter.rect_filled(tr_point, KrustyGrab::ADJUST_POINTS_ROUNDING, KrustyGrab::ADJUST_POINTS_COLOR);
+                painter.rect_filled(bl_point, KrustyGrab::ADJUST_POINTS_ROUNDING, KrustyGrab::ADJUST_POINTS_COLOR);
+                painter.rect_filled(br_point, KrustyGrab::ADJUST_POINTS_ROUNDING, KrustyGrab::ADJUST_POINTS_COLOR);
 
-                painter.rect_filled(tm_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
-                painter.rect_filled(ml_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
-                painter.rect_filled(mr_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
-                painter.rect_filled(bm_point, 0.0, KrustyGrab::ADJUST_POINTS_COLOR);
+                painter.rect_filled(tm_point, KrustyGrab::ADJUST_POINTS_ROUNDING, KrustyGrab::ADJUST_POINTS_COLOR);
+                painter.rect_filled(ml_point, KrustyGrab::ADJUST_POINTS_ROUNDING, KrustyGrab::ADJUST_POINTS_COLOR);
+                painter.rect_filled(mr_point, KrustyGrab::ADJUST_POINTS_ROUNDING, KrustyGrab::ADJUST_POINTS_COLOR);
+                painter.rect_filled(bm_point, KrustyGrab::ADJUST_POINTS_ROUNDING, KrustyGrab::ADJUST_POINTS_COLOR);
             }
 
             //Handle the handles interaction
@@ -297,7 +301,7 @@ impl KrustyGrab {
                     }
 
                     if new_status != GrabStatus::None {
-                        self.update_area(ctx, _frame, pos, new_status);
+                        self.update_area(ctx, frame, pos, new_status);
                     }
                 }
                 None => ctx.set_cursor_icon(CursorIcon::Crosshair),
@@ -309,7 +313,7 @@ impl KrustyGrab {
     fn update_area(
         &mut self,
         ctx: &egui::Context,
-        _frame: &mut eframe::Frame,
+        frame: &mut eframe::Frame,
         pos: Pos2,
         status: GrabStatus,
     ) {
@@ -365,7 +369,7 @@ impl KrustyGrab {
                     //Check if the position of the new center in order to keep it inside the visualized window aka the screenshot area
                     {
                         let size = sel.size();
-                        let window_size = _frame.info().window_info.size;
+                        let window_size = frame.info().window_info.size;
 
                         new_center = new_center.clamp((size / 2.).to_pos2(), (window_size.to_pos2() - pos2(size[0] / 2., size[1] / 2.)).to_pos2());
                     }
@@ -378,7 +382,7 @@ impl KrustyGrab {
             //Update the selected area, after checks, if not in Move mode (area updated in the match clause)
             if self.get_grab_status() != GrabStatus::Move {
                 (new_min, new_max) =
-                    self.check_coordinates(new_min, new_max, _frame.info().window_info.size);
+                    self.check_coordinates(new_min, new_max, frame.info().window_info.size);
                 self.set_select_area(Some(Rect::from_min_max(new_min, new_max)));
             }
         }
