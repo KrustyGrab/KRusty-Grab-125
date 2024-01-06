@@ -10,18 +10,30 @@ pub fn icon_img(name: &str, ctx: &Context) -> TextureId {
                 "pencil",
                 include_bytes!("./images/pencil.svg"),
                 egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "highlighter" => RetainedImage::from_svg_bytes_with_size(
+                "highlighter",
+                include_bytes!("./images/highlighter.svg"),
+                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
             "circle" => RetainedImage::from_svg_bytes_with_size(
                 "circle",
                 include_bytes!("./images/circle.svg"),
+                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "circle_full" => RetainedImage::from_svg_bytes_with_size(
+                "circle_full",
+                include_bytes!("./images/circle_full.svg"),
                 egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
             "rect" => RetainedImage::from_svg_bytes_with_size(
                 "rect",
                 include_bytes!("./images/rect.svg"),
                 egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "rect_full" => RetainedImage::from_svg_bytes_with_size(
+                "rect_full",
+                include_bytes!("./images/rect_full.svg"),
+                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),    
             "arrow" => RetainedImage::from_svg_bytes_with_size(
-                "arrow",
-                include_bytes!("./images/arrow.svg"),
-                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "arrow",
+            include_bytes!("./images/arrow.svg"),
+            egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
             "text" => RetainedImage::from_svg_bytes_with_size(
                 "text",
                 include_bytes!("./images/text.svg"),
@@ -73,14 +85,26 @@ pub fn icon_img(name: &str, ctx: &Context) -> TextureId {
                 "pencil",
                 include_bytes!("./images/pencil_light.svg"),
                 egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "highlighter" => RetainedImage::from_svg_bytes_with_size(
+                "highlighter",
+                include_bytes!("./images/highlighter_light.svg"),
+                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
             "circle" => RetainedImage::from_svg_bytes_with_size(
                 "circle",
                 include_bytes!("./images/circle_light.svg"),
+                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "circle_full" => RetainedImage::from_svg_bytes_with_size(
+                "circle_full",
+                include_bytes!("./images/circle_full_light.svg"),
                 egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
             "rect" => RetainedImage::from_svg_bytes_with_size(
                 "rect",
                 include_bytes!("./images/rect_light.svg"),
                 egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),
+            "rect_full" => RetainedImage::from_svg_bytes_with_size(
+                "rect_full",
+                include_bytes!("./images/rect_full_light.svg"),
+                egui_extras::image::FitTo::Original).unwrap().texture_id(ctx),  
             "arrow" => RetainedImage::from_svg_bytes_with_size(
                 "arrow",
                 include_bytes!("./images/arrow_light.svg"),
