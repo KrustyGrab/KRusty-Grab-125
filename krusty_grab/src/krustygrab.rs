@@ -12,6 +12,7 @@ use egui::{
 };
 use native_dialog::FileDialog;
 use serde::{Deserialize, Serialize};
+use directories::UserDirs;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum Format {
@@ -82,17 +83,18 @@ pub struct KrustyGrabConfig {
 impl Default for KrustyGrabConfig {
     fn default() -> Self {  
         let mut myhotkeys = BTreeMap::new();
-        let h1 = MyHotKey::new(Modifiers::CTRL, Key::S); // Key::A);
-        let h2 = MyHotKey::new(Modifiers::CTRL, Key::A); // Key::S);
-        let h3 = MyHotKey::new(Modifiers::CTRL, Key::Z); // Key::D);
-        let h4 = MyHotKey::new(Modifiers::CTRL, Key::Y); // Key::D);
+        let h1 = MyHotKey::new(Modifiers::CTRL, Key::S);
+        let h2 = MyHotKey::new(Modifiers::CTRL, Key::A);
+        let h3 = MyHotKey::new(Modifiers::CTRL, Key::Z);
+        let h4 = MyHotKey::new(Modifiers::CTRL, Key::Y);
         myhotkeys.insert("Screen".to_string(), h1);
         myhotkeys.insert("Screen Area".to_string(), h2);
         myhotkeys.insert("Undo".to_string(), h3);
         myhotkeys.insert("Redo".to_string(), h4);
+
         Self {
             dark_mode: true,
-            save_folder: Path::new("~/Desktop").to_path_buf(),
+            save_folder: UserDirs::new().expect("Unable to load user dirs").desktop_dir().expect("Unable to find desktop dir").to_path_buf(),
             save_format: Format::Png,
             screenshot_delay: 0,
             myhotkeys,

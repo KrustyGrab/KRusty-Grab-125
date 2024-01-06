@@ -629,7 +629,7 @@ impl KrustyGrab {
                                 }
                                 let to_paint_border = Rect::from_min_max(self.adjust_drawing_pos(ctx, p0, true), self.adjust_drawing_pos(ctx, mouse, true));
                                 painter.rect_stroke(to_paint_border, 0.0, stroke);
-                                tracing::info!("Painted rect with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
+                                // tracing::info!("Painted rect with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
                             },
                             DrawingMode::Highlighter => {
                                 let mut minx = p0.x;
@@ -643,7 +643,7 @@ impl KrustyGrab {
                                 color[3] = color.a() / Self::HIGHLIGTHER_FACTOR ;
                                 let to_paint_border = Rect::from_min_max(self.adjust_drawing_pos(ctx, from_here, true), self.adjust_drawing_pos(ctx, to_there, true));
                                 painter.rect_filled(to_paint_border, 0.0, color );
-                                tracing::info!("Painted highlight with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
+                                // tracing::info!("Painted highlight with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
                             },
                             DrawingMode::FilledRectangle => {
                                 if mouse.x < p0.x {
@@ -654,7 +654,7 @@ impl KrustyGrab {
                                 }
                                 let to_paint_border = Rect::from_min_max(self.adjust_drawing_pos(ctx, p0, true), self.adjust_drawing_pos(ctx, mouse, true));
                                 painter.rect_filled(to_paint_border, 0.0, stroke.color);
-                                tracing::info!("Painted fillrect with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
+                                // tracing::info!("Painted fillrect with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
                             },
                             DrawingMode::Circle => {
                                 // Constructed fixing the center with the starting position and the radius is considered between the start and the cursor current position
@@ -666,7 +666,7 @@ impl KrustyGrab {
                                 center = self.adjust_drawing_pos(ctx, center, true);
 
                                 painter.circle_stroke(center, radius, stroke);
-                                tracing::info!("Painted circle with center {:?}, radius {:?}, stroke {:?}", center, radius, stroke);
+                                // tracing::info!("Painted circle with center {:?}, radius {:?}, stroke {:?}", center, radius, stroke);
                             },
                             DrawingMode::FilledCircle => {
                                 let radius = mouse.distance(p0) / (visualization_ratio*2.0);
@@ -674,13 +674,13 @@ impl KrustyGrab {
                                 center = self.adjust_drawing_pos(ctx, center, true);
 
                                 painter.circle_filled(center, radius, stroke.color);
-                                tracing::info!("Painted circle with center {:?}, radius {:?}, stroke {:?}", center, radius, stroke);
+                                // tracing::info!("Painted circle with center {:?}, radius {:?}, stroke {:?}", center, radius, stroke);
                             },
                             DrawingMode::Arrow => {
                                 let origin = self.adjust_drawing_pos(ctx, p0, true);
                                 let direction = Vec2::new(mouse.x - p0.x, mouse.y - p0.y) / visualization_ratio;
                                 painter.arrow(origin, direction, stroke);
-                                tracing::info!("Painted arrow with origin {:?}, vector {:?}, stroke {:?}", p0, Vec2::new(mouse.x - p0.x, mouse.y - p0.y), stroke);
+                                // tracing::info!("Painted arrow with origin {:?}, vector {:?}, stroke {:?}", p0, Vec2::new(mouse.x - p0.x, mouse.y - p0.y), stroke);
                             },
                             _ => {},
                         }
