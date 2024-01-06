@@ -12,7 +12,7 @@ fn main() {
     let mut win_options = NativeOptions::default();
     
     win_options.initial_window_size = Some(Vec2::new(960., 540.));
-    win_options.min_window_size = Some(Vec2::new(859.0, 0.0));                  //Avoid toolbar overlapping
+    win_options.min_window_size = Some(Vec2::new(939.0, 0.0));                  //Avoid toolbar overlapping
 
     run_native(
             "KrustyGrab", 

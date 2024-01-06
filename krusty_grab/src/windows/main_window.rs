@@ -9,15 +9,21 @@ use arboard::{Clipboard, ImageData};
 
 impl KrustyGrab {
     pub fn main_window(&mut self, ctx: &Context, frame: &mut eframe::Frame){
+        
         self.render_top_panel(ctx, frame);
         self.render_bottom_panel(ctx);
         self.render_central_panel(ctx);
 
-        if self.is_window_status_crop() {
+        if self.is_window_status_crop(){
             frame.set_fullscreen(true);
+        } else if self.is_window_status_save(){
+            // frame.set_fullscreen(false);
         }
 
-        if self.screenshot_requested {
+        if self.is_window_status_save() {
+            frame.set_visible(true);
+        }
+        if self.screenshot_requested  {
             frame.set_visible(false);
         }
     }
@@ -30,7 +36,7 @@ impl KrustyGrab {
                 // Option menu
                 ui.menu_image_button(icon_img("gear", ctx), ICON_SIZE, |ui| {
                     
-                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("SM_open"), true)); //TODO dubbia utilità
+                    ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("SM_open"), true));
 
                     if ui
                         .button(RichText::new("📁 Open").text_style(TextStyle::Body))
@@ -145,56 +151,25 @@ impl KrustyGrab {
                             .clamp_range(0..=120)
                             .prefix("Timer: "),
                     ).on_hover_text_at_pointer("Select timer");
-                    
-                    // });
-
-                    // OLD BUTTON TO REMOVE
-                    //Timer selection
-                    // ui.menu_image_button(icon_img("timer", ctx), ICON_SIZE, |ui| {
-                    //     if ui.button(RichText::new("0 seconds").text_style(TextStyle::Body)).clicked() {
-                    //         self.config.screenshot_delay = 0;
-                    //         ui.close_menu();
-                    //     }
-                    //     if ui.button(RichText::new("5 seconds").text_style(TextStyle::Body)).clicked() {
-                    //         self.config.screenshot_delay = 5;
-                    //         ui.close_menu();
-                    //     }
-                    //     if ui.button(RichText::new("10 seconds").text_style(TextStyle::Body)).clicked() {
-                    //         self.config.screenshot_delay = 10;
-                    //         ui.close_menu();
-                    //     }
-                    //     if ui.button(RichText::new("15 seconds").text_style(TextStyle::Body)).clicked() {
-                    //         self.config.screenshot_delay = 15;
-                    //         ui.close_menu();
-                    //     }
-                    //     if ui.button(RichText::new("30 seconds").text_style(TextStyle::Body)).clicked() {
-                    //         self.config.screenshot_delay = 30;
-                    //         ui.close_menu();
-                    //     }
-                    // }).response
-                    // .on_hover_cursor(CursorIcon::PointingHand)
-                    // .on_hover_text_at_pointer("Screenshot delay");
 
                     //Screen selection
-                    // ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
-                        if screens_number() != 1 {
-                            let screen_selected: usize = 1 + self.get_selected_screen();
-        
-                            ui.menu_button(RichText::new("Screen ".to_string() + screen_selected.to_string().as_str()).text_style(TextStyle::Body), |ui| {
-                                for i in 0..screens_number() {
-                                    if ui.button(RichText::new("Screen ".to_string() + (i+1).to_string().as_str()).text_style(TextStyle::Body)).clicked() {
-                                        self.set_selected_screen(i);
-                                        ui.close_menu();
-                                    }
+                    if screens_number() != 1 {
+                        let screen_selected: usize = 1 + self.get_selected_screen();
+    
+                        ui.menu_button(RichText::new("Screen ".to_string() + screen_selected.to_string().as_str()).text_style(TextStyle::Body), |ui| {
+                            for i in 0..screens_number() {
+                                if ui.button(RichText::new("Screen ".to_string() + (i+1).to_string().as_str()).text_style(TextStyle::Body)).clicked() {
+                                    self.set_selected_screen(i);
+                                    ui.close_menu();
                                 }
-                            }).response
-                            .on_hover_cursor(CursorIcon::PointingHand)
-                            .on_hover_text_at_pointer("Select screen");
-                        }
-                        else {
-                            ui.label(RichText::new("1").text_style(TextStyle::Body));
-                        }
-                    // }); 
+                            }
+                        }).response
+                        .on_hover_cursor(CursorIcon::PointingHand)
+                        .on_hover_text_at_pointer("Select screen");
+                    }
+                    else {
+                        ui.label(RichText::new("1").text_style(TextStyle::Body));
+                    }
                 });
             });
             ui.add_space(3.);
@@ -227,7 +202,7 @@ impl KrustyGrab {
     ///Used to take and set the screenshot to visualize. Used when screenshot or select crop area buttons are pressed
     pub fn set_screenshot(&mut self, ctx: &Context) {
         //Insert a delay in order to let the fade out animation of the application to be completed
-        thread::sleep(Duration::from_millis(125) + Duration::from_secs(self.config.screenshot_delay as u64));
+        thread::sleep(Duration::from_millis(150) + Duration::from_secs(self.config.screenshot_delay as u64));
 
         let screen_selected: usize = self.get_selected_screen();
         let im = take_screen(screen_selected).expect("Problem taking the screenshot");

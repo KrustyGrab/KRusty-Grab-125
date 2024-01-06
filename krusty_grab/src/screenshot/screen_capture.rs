@@ -2,7 +2,6 @@
 use std::{
     fs::File,
     path::PathBuf,
-    time::Instant,
 };
 
 use anyhow::Error;
@@ -31,7 +30,7 @@ pub fn screens_number() -> usize {
 }
 
 pub fn save_image(image: ColorImage, save_path: PathBuf) -> Result<(), Error> {
-    //Formulazione temporanea per la conversione da ColorImage a Vec<u8> utilizzato per la conversione in ImageBuffer
+    //Converting from COlorImage to Vec<u8> for saving
     let pix: Vec<u8> = image
         .pixels
         .iter()
@@ -41,9 +40,6 @@ pub fn save_image(image: ColorImage, save_path: PathBuf) -> Result<(), Error> {
     let im: ImageBuffer<Rgba<u8>, Vec<_>> =
         ImageBuffer::from_vec(image.width() as u32, image.height() as u32, pix)
             .expect("Unable to obtain ImageBuffer from vec");
-
-    let t = Instant::now();
-
     
     match save_path.clone().extension() {
         Some(ext) => {
@@ -52,15 +48,11 @@ pub fn save_image(image: ColorImage, save_path: PathBuf) -> Result<(), Error> {
                     im.save_with_format(save_path, ImageFormat::Png)
                         .expect("Unable to save the image");
 
-                    println!("Inside {:?}", t.elapsed());
-
                     return Ok(());
                 },
                 "jpg" => {
                     im.save_with_format(save_path, ImageFormat::Jpeg)
                         .expect("Unable to save the image");
-        
-                    println!("Inside {:?}", t.elapsed());
         
                     return Ok(());
                 },
@@ -73,13 +65,11 @@ pub fn save_image(image: ColorImage, save_path: PathBuf) -> Result<(), Error> {
                         .encode_frame(frame)
                         .expect("Unable to encode gif frame");
         
-                    println!("Inside {:?}", t.elapsed());
-        
                     return Ok(());
                 },
-                _ => todo!(),
+                _ => unreachable!("How did you ended up here??"),
             };
         },
-        None => todo!(),
+        None => unreachable!("File saving extension must be Some"),
     }
 }

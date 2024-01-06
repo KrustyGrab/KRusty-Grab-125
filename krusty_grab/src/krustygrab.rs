@@ -1,18 +1,17 @@
-use std::{iter::Map, collections::{HashMap, BTreeMap}, path::Display, arch::x86_64::__cpuid};
+use std::collections::BTreeMap;
 #[allow(unused)]
 use std::{path::{PathBuf, Path}, time::Instant, io::Write};
 
-use crate::painting::{icons::{icon_img, ICON_SIZE}, drawing::{DrawingType, RedoList}};
+use crate::{painting::{icons::{icon_img, ICON_SIZE}, drawing::{DrawingType, RedoList}}, screenshot::screen_capture::save_image};
 use eframe::{App, CreationContext};
 use egui::{
     Button, ColorImage, Context, FontId, Grid, Layout, Rect,
     RichText, TextStyle, Visuals,
     Widget, Window, TextEdit,
-    Key, Modifiers, Event, KeyboardShortcut, Sense, Align, Vec2, popup_below_widget, Id,
+    Key, Modifiers, KeyboardShortcut, popup_below_widget, Id, pos2,
 };
 use native_dialog::FileDialog;
 use serde::{Deserialize, Serialize};
-use egui_hotkey::{Hotkey, BindVariant};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum Format {
@@ -127,6 +126,7 @@ pub enum GrabStatus {
 pub enum WindowStatus {
     Main,
     Crop,
+    Save,
 }
 
 pub struct KrustyGrab {
@@ -140,6 +140,7 @@ pub struct KrustyGrab {
     select: Option<Rect>,
     temp_image: Option<ColorImage>,
     selected_screen: usize,
+    pub save_path_request: Option<PathBuf>,
     // paint: Painting,
 }
 
@@ -156,6 +157,7 @@ impl Default for KrustyGrab {
             temp_image: None,
             selected_screen: 0,
             screenshot_requested: false,
+            save_path_request: None,
         }
     }
 }
@@ -245,6 +247,12 @@ impl KrustyGrab {
     pub fn is_window_status_crop(&self) -> bool {
         match self.window_status {
             WindowStatus::Crop => true,
+            _ => false
+        }
+    }
+    pub fn is_window_status_save(&self) -> bool {
+        match self.window_status {
+            WindowStatus::Save => true,
             _ => false
         }
     }
@@ -418,15 +426,29 @@ impl KrustyGrab {
 }
 
 impl App for KrustyGrab {
+    fn post_rendering(&mut self, _window_size_px: [u32; 2], frame: &eframe::Frame) {
+        if let Some(res) = frame.screenshot() {
+            if let Some(path) = self.save_path_request.clone() { 
+                let save_region = &self.get_selected_area().unwrap_or_else(||Rect::from_min_size(pos2(0.0, 0.0), frame.info().window_info.size));
+                save_image(res.region(save_region, None), path).expect("Unable to save");
+            }        
+            self.save_path_request = None;
+            self.set_window_status(WindowStatus::Main);
+        }
+    }
+    
     fn update(&mut self, ctx: &Context, frame: &mut eframe::Frame) {
-        // let i = Instant::now();      //TODO rimuovere dalla release
+        if self.save_path_request.is_none(){
+            frame.set_fullscreen(false);
+        }
+        
         if self.config.dark_mode {
             ctx.set_visuals(Visuals::dark());
         } else {
             ctx.set_visuals(Visuals::light());
         }
 
-        if self.config_window {
+        if self.config_window && !self.is_window_status_crop(){
             self.render_config(ctx);
         }
 
@@ -440,6 +462,7 @@ impl App for KrustyGrab {
         match self.window_status {
             WindowStatus::Main => self.main_window(ctx, frame),
             WindowStatus::Crop => self.crop_screen_window(ctx, frame),
+            WindowStatus::Save => self.save_window(ctx, frame),
         }
     
         //Handler for majour shortcuts
@@ -536,9 +559,11 @@ impl App for KrustyGrab {
                         }
                     }
                     "Screen" => {
+                        frame.set_visible(false);
                         self.screenshot_requested = true;
                     }
                     "Screen Area" => {
+                        frame.set_visible(false);
                         self.set_window_status(self::WindowStatus::Crop);
                         self.screenshot_requested = true;
                     },

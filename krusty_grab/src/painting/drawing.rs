@@ -1,10 +1,10 @@
-use std::{collections::VecDeque, cmp::{min, max}};
+use std::collections::VecDeque;
 
 use egui::{Context, Pos2, Stroke, Rect, Vec2, Rgba, Color32, Layout, Align, Button, Id, color_picker::{color_edit_button_rgba, Alpha}, DragValue, Ui, LayerId, Order, pos2, Align2, FontId, Widget, Window, Painter, CursorIcon, RichText, TextStyle};
 use egui_extras::RetainedImage;
 use native_dialog::FileDialog;
 use serde::{Serialize, Deserialize};
-use crate::{krustygrab::{self, KrustyGrab }, screenshot::screen_capture::save_image};
+use crate::krustygrab::{self, KrustyGrab };
 use crate::painting::icons::{icon_img, ICON_SIZE};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -67,9 +67,10 @@ impl RedoList {
 impl KrustyGrab {
     pub const REDO_LIST_SIZE: usize = 10;
     pub const BASE_TEXT_SIZE: f32 = 30.0;
+    pub const HIGHLIGTHER_FACTOR: u8 = 70;
 
     // Render the part of head toolbar for the drawing 
-    pub fn render_drawing_toolbar(&mut self, ctx: &Context, ui: &mut Ui, _frame: &mut eframe::Frame) {
+    pub fn render_drawing_toolbar(&mut self, ctx: &Context, ui: &mut Ui, frame: &mut eframe::Frame) {
         let mut color = match ctx.memory(|mem| mem.data.get_temp::<Rgba>(Id::from("Color"))){
             Some(c) => c,
             None => Rgba::from(Color32::GREEN)
@@ -125,7 +126,7 @@ impl KrustyGrab {
             if drawing_mode == DrawingMode::FilledCircle {
                 name_icon = "circle_full";
             }
-            let mut circle_button = ui.menu_image_button(icon_img(name_icon, ctx), ICON_SIZE, |ui| {
+            let circle_button = ui.menu_image_button(icon_img(name_icon, ctx), ICON_SIZE, |ui| {
                 if ui
                     .button(RichText::new("Circle").text_style(TextStyle::Body))
                     .on_hover_text_at_pointer("Circle")
@@ -151,7 +152,7 @@ impl KrustyGrab {
 
 
             if drawing_mode == DrawingMode::Circle || drawing_mode == DrawingMode::FilledCircle {
-                circle_button = circle_button.highlight();
+                circle_button.highlight();
             }
             
             //[Rectangle|Filled Rectangle] button
@@ -160,7 +161,7 @@ impl KrustyGrab {
                 name_icon = "rect_full";
             }
 
-            let mut rectangle_button = ui.menu_image_button(icon_img(name_icon, ctx), ICON_SIZE, |ui| {
+            let rectangle_button = ui.menu_image_button(icon_img(name_icon, ctx), ICON_SIZE, |ui| {
                 if ui
                 .button(RichText::new("Rectangle").text_style(TextStyle::Body))
                 .on_hover_text_at_pointer("Rectangle")
@@ -183,7 +184,7 @@ impl KrustyGrab {
             }).response.on_hover_cursor(CursorIcon::PointingHand).on_hover_text_at_pointer("Rectangles");
 
             if drawing_mode == DrawingMode::Rectangle || drawing_mode == DrawingMode::FilledRectangle {
-                rectangle_button = rectangle_button.highlight();
+                rectangle_button.highlight();
             }
 
             //Arrow button
@@ -203,22 +204,22 @@ impl KrustyGrab {
                 tracing::info!("Arrow selected");
             }
 
-            //Text button
-            let mut text_button = Button::image_and_text(icon_img("text", ctx), ICON_SIZE, "")
-                .stroke(Stroke::new(1.0,
-                Color32::from_rgb(128, 106, 0)))
-                .ui(ui)
-                .on_hover_cursor(CursorIcon::PointingHand)
-                .on_hover_text_at_pointer("Text");
+            //Text button - TODO Broken ATM
+            // let mut text_button = Button::image_and_text(icon_img("text", ctx), ICON_SIZE, "")
+            //     .stroke(Stroke::new(1.0,
+            //     Color32::from_rgb(128, 106, 0)))
+            //     .ui(ui)
+            //     .on_hover_cursor(CursorIcon::PointingHand)
+            //     .on_hover_text_at_pointer("Text");
 
-            if drawing_mode == DrawingMode::Text {
-                text_button = text_button.highlight();
-            }
+            // if drawing_mode == DrawingMode::Text {
+            //     text_button = text_button.highlight();
+            // }
 
-            if text_button.clicked() {
-                ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Text));
-                tracing::info!("Text selected");
-            }
+            // if text_button.clicked() {
+            //     ctx.memory_mut(|mem| mem.data.insert_temp(Id::from("DrawingMode"), DrawingMode::Text));
+            //     tracing::info!("Text selected");
+            // }
 
             //Color picker rendering
             let color_picker = color_edit_button_rgba(ui, &mut color, Alpha::BlendOrAdditive)
@@ -349,11 +350,19 @@ impl KrustyGrab {
                 .clicked() {
 
                 let mut save_path = self.config.save_folder.clone();
-                save_path.push(format!("{}", chrono::Utc::now().format("%Y_%m_%d-%H_%M_%S")));      //TODO decidere il formato di salvataggio
+                save_path.push(format!("{}", chrono::Utc::now().format("%Y_%m_%d-%H_%M_%S")));
                 save_path.set_extension(self.config.save_format.to_string());
+
+                println!("{save_path:?}");
+                self.save_path_request = Some(save_path);
                 
-                save_image(self.get_temp_image().expect("Image must be defined"), save_path).expect("Unable to save");
-                
+                // save_image(self.get_temp_image().expect("Image must be defined"), save_path).expect("Unable to save");
+
+                frame.set_visible(false);
+                frame.set_fullscreen(true);
+                self.set_window_status(krustygrab::WindowStatus::Save); 
+                // frame.request_screenshot();
+
                 tracing::info!("Save button selected");
             }
 
@@ -366,13 +375,19 @@ impl KrustyGrab {
                 .clicked() {
 
                 if let Some(path) = FileDialog::new()
-                    // .set_location(&self.config.save_folder)      //TODO decidere se si vuole forzare sempre la cartella di default oppure se lasciare l'ultima cartella visualizzata in fase di salvataggio
                     .add_filter("PNG", &["png"])
                     .add_filter("JPG", &["jpg"])
                     .add_filter("GIF", &["gif"])
                     .show_save_single_file()
                     .expect("Unable to visualize the file selection window") {
-                        save_image(self.get_temp_image().expect("Image must be defined"), path).expect("Unable to save as");
+                        self.save_path_request = Some(path);
+
+                        frame.set_visible(false);
+                        frame.set_fullscreen(true);
+                        self.set_window_status(krustygrab::WindowStatus::Save); 
+                        // frame.request_screenshot();
+                
+                        // save_image(self.get_temp_image().expect("Image must be defined"), path).expect("Unable to save as");
                     }
 
                 tracing::info!("Save as button selected");
@@ -489,7 +504,7 @@ impl KrustyGrab {
             };
 
             //Computation of text editor position in order to maintain it inside the screen (values are obtained experimentally)
-            //TODO controllo orizzontale
+            //TODO add orizzontal check for text box
             let mut te_pos = self.adjust_drawing_pos(ctx, text_pos, true);
 
             if te_pos.y + 97.0 > area.size()[1] + area.min.y {
@@ -606,7 +621,7 @@ impl KrustyGrab {
                                 });
                             },
                             DrawingMode::Rectangle => {
-                                if mouse.x < p0.x { //TODO possibile rimuovere un set di controllo di questo tipo dai rect, trovare quale (possibile anche per circle)
+                                if mouse.x < p0.x {
                                     (mouse.x, p0.x) = (p0.x, mouse.x);
                                 }
                                 if mouse.y < p0.y {
@@ -625,13 +640,13 @@ impl KrustyGrab {
                                 let from_here = Pos2::new(minx , p0.y - stroke.width*5.);
                                 let to_there = Pos2::new(maxx , p0.y + stroke.width*5.);
                                 let mut color = stroke.color.clone();
-                                color[3] = color.a() / 3 ;
+                                color[3] = color.a() / Self::HIGHLIGTHER_FACTOR ;
                                 let to_paint_border = Rect::from_min_max(self.adjust_drawing_pos(ctx, from_here, true), self.adjust_drawing_pos(ctx, to_there, true));
                                 painter.rect_filled(to_paint_border, 0.0, color );
                                 tracing::info!("Painted highlight with p0 {:?}, mouse {:?}, stroke {:?}", p0, mouse, stroke);
                             },
                             DrawingMode::FilledRectangle => {
-                                if mouse.x < p0.x { //TODO possibile rimuovere un set di controllo di questo tipo dai rect, trovare quale (possibile anche per circle)
+                                if mouse.x < p0.x {
                                     (mouse.x, p0.x) = (p0.x, mouse.x);
                                 }
                                 if mouse.y < p0.y {
@@ -787,8 +802,6 @@ impl KrustyGrab {
                                 mem.data.insert_temp(Id::from("Drawing"), drawings.clone());
 
                                 if !primary_up {
-                                    //Rescaling della posizione del mouse sulla dimensione completa dello screen in modo da mantenere la posizione fissa sulla tela
-                                    // mouse = self.adjust_drawing_pos(ctx, mouse, false);  //TODO controllare perchè inserendo questo rescale si ha un crash in caso di uscita dalla tela
                                     mem.data.insert_temp(Id::from("previous_pos"), mouse);
                                 }
                                 else {
@@ -835,7 +848,7 @@ impl KrustyGrab {
     }
 
     ///Shows the saved drawings
-    fn show_drawings(&mut self, ctx: &Context, painter: &Painter, visualization_ratio: f32) {
+    pub fn show_drawings(&mut self, ctx: &Context, painter: &Painter, visualization_ratio: f32) {
         let drawings = match ctx.memory(|mem| mem.data.get_temp::<Vec<DrawingType>>(Id::from("Drawing"))) {
             Some(v) => v,
             None => Vec::<DrawingType>::new(),
@@ -855,7 +868,7 @@ impl KrustyGrab {
                 DrawingType::Highlighter { r, s } => {
                     let to_paint = Rect::from_min_max(self.adjust_drawing_pos(ctx, r.min, true), self.adjust_drawing_pos(ctx, r.max, true));
                     let mut color = s.color.clone();
-                    color[3] = color.a() / 3 ;
+                    color[3] = color.a() / Self::HIGHLIGTHER_FACTOR ;
                     painter.rect_filled(to_paint, 0.0, color);
                 },
                 DrawingType::Rectangle { r, s } => {
@@ -884,7 +897,7 @@ impl KrustyGrab {
                 DrawingType::Text { mut p , t , s} => {
                     p = self.adjust_drawing_pos(ctx, p, true);
                     //Regolazione del font in base alla dimensione della finestra di render
-                    let font_size = (KrustyGrab::BASE_TEXT_SIZE * s.width) / visualization_ratio; //TODO vedere se possibile ottenere del testo che non balla con il resizing
+                    let font_size = (KrustyGrab::BASE_TEXT_SIZE * s.width) / visualization_ratio; //TODO Giggling text, unfixable
                     // println!("Size: {font_size:?}");
                     painter.text(p, Align2::LEFT_CENTER, t, FontId::new(font_size, egui::FontFamily::Proportional), s.color);
                 },
@@ -910,7 +923,7 @@ impl KrustyGrab {
                 },
                 DrawingType::Highlighter { r, s } => {
                     let mut color = s.color.clone();
-                    color[3] = color.a() / 3 ;
+                    color[3] = color.a() / Self::HIGHLIGTHER_FACTOR ;
                     painter.rect_filled(r, 0.0, color);
                 },
                 DrawingType::Rectangle { r, s } => {
@@ -920,7 +933,7 @@ impl KrustyGrab {
                     painter.rect_filled(r, 0.0, s.color);
                 },
                 DrawingType::Circle { c, r, s } => {
-                    painter.circle(c, r, s.color, s);
+                    painter.circle_stroke(c, r, s);
                 },
                 DrawingType::FilledCircle { c, r, s } => {
                     painter.circle(c, r, s.color, s);

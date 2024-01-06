@@ -32,7 +32,6 @@ impl KrustyGrab {
             //Changing cursor to selection one
             ctx.set_cursor_icon(CursorIcon::Crosshair);
 
-            //TODO Decidere se dare la possibilità di rimuovere l'area
             //Buttons for confirming or cancelling area selection. Visibles only when no manipulation is ongoing
             let mut save_rect: Rect = Rect::NOTHING;
             let mut cancel_rect: Rect = Rect::NOTHING;
@@ -66,7 +65,6 @@ impl KrustyGrab {
                                                 .unwrap()
                                                 .region(&self.get_selected_area().unwrap(), None);
                                         
-                                            //TODO decidere se implementare la copia dei disegni e in che modo (due punti in cui si copia in clipboard)
                                             let mut clipboard = Clipboard::new().expect("Unable to create clipboard");
                                             if let Err(e) = clipboard.set_image(ImageData { width: im.width(), height: im.height(), bytes: Cow::from(im.as_raw().clone())}) {
                                                 tracing::error!("Unable to copy in the clipboard: {e:?}");
