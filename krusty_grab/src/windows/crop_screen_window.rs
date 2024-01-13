@@ -18,9 +18,11 @@ impl KrustyGrab {
 
     ///Manage the visualization of the area selection.
     pub fn crop_screen_window(&mut self, ctx: &Context, frame: &mut eframe::Frame) {
-        if self.is_window_status_crop() {
+        
+        if self.is_window_status_crop() { //should always be the case
             frame.set_fullscreen(true);
         }
+
         CentralPanel::default().show(ctx, |_ui| {
             let window_size = frame.info().window_info.size;
             let mut painter = ctx.layer_painter(LayerId::background());
@@ -38,6 +40,7 @@ impl KrustyGrab {
             
             let mut pressed = false;
 
+            //If we are not grabbing
             if self.get_grab_status() == GrabStatus::None {
                 _ui.with_layer_id(
                     LayerId::new(egui::Order::Foreground, Id::from("Save")),
@@ -52,12 +55,13 @@ impl KrustyGrab {
                             let pointer_pos = ctx.pointer_hover_pos();
 
                             if pointer_pos.is_some(){
-                                //Save button
+                                //Save button area
                                 if save_rect.contains(pointer_pos.unwrap())
                                 {
                                     ctx.set_cursor_icon(CursorIcon::PointingHand);
                                     save.highlight();
     
+                                    //If clicked
                                     if ctx.input(|i| i.pointer.primary_clicked()) {
                                         if self.get_selected_area().is_some() {
                                             //Save the screen part inside the selected area.
@@ -87,6 +91,7 @@ impl KrustyGrab {
                                     cancel.highlight();
     
                                     if ctx.input(|i| i.pointer.primary_clicked()) {
+                                        //restore the prev area
                                         let prev_area = ctx.memory_mut(|mem| {
                                             mem
                                                 .data
@@ -107,7 +112,6 @@ impl KrustyGrab {
             //Return to main window and reshape the window if any button pressed
             if pressed {
                 self.set_window_status(WindowStatus::Main);
-
                 frame.set_fullscreen(false);
             }
             else{
@@ -120,14 +124,18 @@ impl KrustyGrab {
                     Color32::WHITE,
                 );
     
+                //render the drawings
                 self.show_drawings_in_select(ctx, &painter);
     
                 //Show the selected area if present
                 self.show_selected_area(ctx, frame, &mut painter);
     
+                //If we are not in the save or cancel button areas, we call select_area
                 if ctx.pointer_hover_pos().is_some()
-                    && !(save_rect.contains(ctx.pointer_hover_pos().unwrap())
-                        || cancel_rect.contains(ctx.pointer_hover_pos().unwrap()))
+                    && !(
+                        save_rect.contains(ctx.pointer_hover_pos().unwrap())
+                        || cancel_rect.contains(ctx.pointer_hover_pos().unwrap())
+                    )
                 {
                     self.select_area(ctx, frame);
                 }
@@ -145,8 +153,10 @@ impl KrustyGrab {
         }
         //Otherwhise start the selection, if it is not started and a mouse pression is detected, or continue it until the mouse is released
         else if ctx.input(|i| i.pointer.primary_down())
-            && (self.get_grab_status() == GrabStatus::Select
-                || self.get_grab_status() == GrabStatus::None)
+            && (
+                self.get_grab_status() == GrabStatus::Select
+                || self.get_grab_status() == GrabStatus::None
+            )
         {
             self.set_grab_status(GrabStatus::Select);
 
@@ -162,8 +172,8 @@ impl KrustyGrab {
 
             //Update the saved area
             if init_pos != drag_pos {
-                (init_pos, drag_pos) =
-                    self.check_coordinates(init_pos, drag_pos, frame.info().window_info.size);
+                //Eventually modify to keep them inside boundaries/have the correct min and max 
+                (init_pos, drag_pos) = self.adjust_coordinates(init_pos, drag_pos, frame.info().window_info.size);
                 self.set_select_area(Some(Rect::from_min_max(init_pos, drag_pos)));
             }
         }
@@ -181,13 +191,11 @@ impl KrustyGrab {
         //Check if the area is Some, otherwise draw the background overlay on all the screen
         match self.get_selected_area() {
             Some(sel) => {
-                let min = sel.min;
-                let max = sel.max;
+                let min_x = sel.min.x;
+                let max_x = sel.max.x;
 
-                let min_x = min.x;
-                let max_x = max.x;
-                let min_y = min.y;
-                let max_y = max.y;
+                let min_y = sel.min.y;
+                let max_y = sel.max.y;
 
                 //Draw the overlay only on the screen parts that are not selected. Achieved using 4 rectangles
                 painter.rect_filled(
@@ -233,13 +241,15 @@ impl KrustyGrab {
         let sel = self
             .get_selected_area()
             .expect("Selected area must be Some");
+
         let grab_status = self.get_grab_status();
 
-        //The draggable points are drawn only when the selction sequence is not ongoing
+        //The draggable points are drawn only when the selection sequence is not ongoing
+
         if grab_status != GrabStatus::Select {
             let point_dim = Vec2::splat(KrustyGrab::GRABBABLE_POINTS_SIZE);
 
-            //Handle points shapes
+            //Creating handle points
             let tl_point = Rect::from_center_size(sel.left_top(), point_dim);
             let tm_point = Rect::from_center_size(sel.center_top(), point_dim);
             let tr_point = Rect::from_center_size(sel.right_top(), point_dim);
@@ -249,9 +259,9 @@ impl KrustyGrab {
             let bm_point = Rect::from_center_size(sel.center_bottom(), point_dim);
             let br_point = Rect::from_center_size(sel.right_bottom(), point_dim);
 
-            //Handles are only drawn if the selection area is not being moved
+            //Handle points drawn if selection area is not being moved
             if grab_status != GrabStatus::Move {
-                //Draw the handles for resizing
+                //Draw the handle points for resizing
                 painter.set_layer_id(LayerId::new(Order::Middle, Id::from("points_painter")));
                 painter.rect_filled(tl_point, KrustyGrab::ADJUST_POINTS_ROUNDING, KrustyGrab::ADJUST_POINTS_COLOR);
                 painter.rect_filled(tr_point, KrustyGrab::ADJUST_POINTS_ROUNDING, KrustyGrab::ADJUST_POINTS_COLOR);
@@ -264,7 +274,7 @@ impl KrustyGrab {
                 painter.rect_filled(bm_point, KrustyGrab::ADJUST_POINTS_ROUNDING, KrustyGrab::ADJUST_POINTS_COLOR);
             }
 
-            //Handle the handles interaction
+            //Handle the interaction with the handle points 
             match ctx.pointer_hover_pos() {
                 Some(pos) => {
                     let mut new_status = GrabStatus::None;
@@ -379,8 +389,7 @@ impl KrustyGrab {
 
             //Update the selected area, after checks, if not in Move mode (area updated in the match clause)
             if self.get_grab_status() != GrabStatus::Move {
-                (new_min, new_max) =
-                    self.check_coordinates(new_min, new_max, frame.info().window_info.size);
+                (new_min, new_max) = self.adjust_coordinates(new_min, new_max, frame.info().window_info.size);
                 self.set_select_area(Some(Rect::from_min_max(new_min, new_max)));
             }
         }
@@ -393,8 +402,8 @@ impl KrustyGrab {
         }
     }
 
-    ///Checks if the coordinates are inside the visualized window
-    fn check_coordinates(&mut self, start: Pos2, end: Pos2, window_size: Vec2) -> (Pos2, Pos2) {
+    ///Checks inside the visualized window and which one is the min 
+    fn adjust_coordinates(&mut self, start: Pos2, end: Pos2, window_size: Vec2) -> (Pos2, Pos2) {
         let mut init_pos = start.clamp(pos2(0., 0.), window_size.to_pos2());
         let mut end_pos = end.clamp(pos2(0., 0.), window_size.to_pos2());
 
@@ -402,9 +411,7 @@ impl KrustyGrab {
         let mut grab_status = self.get_grab_status();
 
         if init_pos.x > end_pos.x {
-            let tmp = init_pos.x;
-            init_pos.x = end_pos.x;
-            end_pos.x = tmp;
+            (init_pos.x, end_pos.x) = (end_pos.x, init_pos.x);
 
             if grab_status == GrabStatus::MidLeft {
                 grab_status = GrabStatus::MidRight;
@@ -422,10 +429,8 @@ impl KrustyGrab {
         }
 
         if init_pos.y > end_pos.y {
-            let tmp = init_pos.y;
-            init_pos.y = end_pos.y;
-            end_pos.y = tmp;
-
+            (init_pos.y, end_pos.y) = (end_pos.y, init_pos.y);
+            
             if grab_status == GrabStatus::TopMid {
                 grab_status = GrabStatus::BotMid;
             } else if grab_status == GrabStatus::BotMid {

@@ -64,7 +64,6 @@ pub fn save_image(image: ColorImage, save_path: PathBuf) -> Result<(), Error> {
                     gif_encoder
                         .encode_frame(frame)
                         .expect("Unable to encode gif frame");
-        
                     return Ok(());
                 },
                 _ => unreachable!("How did you ended up here??"),

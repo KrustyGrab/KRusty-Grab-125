@@ -35,8 +35,8 @@ impl ToString for Format {
 pub struct MyHotKey{
     pub modifier: Modifiers,
     pub key: Option::<Key>,
-
 }
+
 impl MyHotKey{
     fn new(modifier: Modifiers, key: Key)-> Self{
         if key == Key::Enter {
@@ -143,7 +143,6 @@ pub struct KrustyGrab {
     temp_image: Option<ColorImage>,
     selected_screen: usize,
     pub save_path_request: Option<PathBuf>,
-    // paint: Painting,
 }
 
 impl Default for KrustyGrab {
@@ -225,7 +224,6 @@ impl KrustyGrab {
     pub fn get_selected_screen(&self) -> usize {
         self.selected_screen
     }
-
     pub fn set_grab_status(&mut self, new_status: GrabStatus) {
         self.grab_status = new_status;
     }
@@ -252,6 +250,7 @@ impl KrustyGrab {
             _ => false
         }
     }
+
     pub fn is_window_status_save(&self) -> bool {
         match self.window_status {
             WindowStatus::Save => true,
@@ -259,6 +258,7 @@ impl KrustyGrab {
         }
     }
 
+    // Render the config panel
     fn render_config(&mut self, ctx: &Context) {
         Window::new(RichText::new("Configuration").text_style(TextStyle::Body)).show(ctx, |ui| {
             Grid::new("configGrid")
@@ -267,10 +267,6 @@ impl KrustyGrab {
                 .striped(true)
                 .show(ui, |ui| {
                     ui.label("Save folder:");
-                    // let prev_save = self.config.save_folder.clone();
-                    // let mut new_save = String::new();
-                    // ui.add(egui::TextEdit::singleline(&mut new_save).hint_text(prev_save));
-                    // ui.text_edit_singleline(&mut self.config.save_folder);
                     if Button::image_and_text(icon_img("folder", ctx), ICON_SIZE, "")
                         .ui(ui)
                         .clicked() {
@@ -286,19 +282,6 @@ impl KrustyGrab {
                     ui.label(self.config.save_folder.to_str().expect("Default folder path should be convertible into str"));
                     ui.add_space(5.0);
                     ui.end_row();
-
-                    // if text_input.lost_focus() && ui.input(|i| {i.key_pressed(egui::Key::Enter)}) {
-                    //     if let Err(e) = confy::store("krustygrab", None, KrustyGrabConfig {
-                    //         dark_mode: self.config.dark_mode,
-                    //         save_folder: self.config.save_folder.to_string(),
-                    //         save_format: self.config.save_format.clone(),
-                    //     }) {
-                    //         tracing::error!("Failed saving app state: {}", e);
-                    //     }
-                    //     else {
-                    //         tracing::error!("App state saved");
-                    //     }
-                    // }
 
                     ui.label("Save format:");
                     egui::ComboBox::from_label("Format")
@@ -338,8 +321,10 @@ impl KrustyGrab {
                     for (shortcut_name , mut my_hotkey) in self.config.myhotkeys.clone(){
                         ui.label(shortcut_name.clone() + ": ");
 
+                        //Create text edit
                         let text_edit = TextEdit::singleline(&mut my_hotkey.humanprint()).ui(ui);
 
+                        //Create popup error
                         let popup_id = ui.make_persistent_id(format!("popup_overlapping {shortcut_name}"));
                         popup_below_widget(ui, popup_id, &text_edit, |ui| {
                             ui.label("You should provide a unique hotkey");
@@ -407,30 +392,27 @@ impl KrustyGrab {
                                 None,
                                 self.config.clone(),
                             ) {
-                                println!("{:?}", self.config);
-                                tracing::error!("Failed saving app state: {}", e);
+                                tracing::error!("Failed saving app state: {} - {:?}", e, self.config);
                             } else {
                                 tracing::info!("App state saved");
                             }
                             self.config_window = false;
                         }
                     });
-                    // });
                     ui.end_row();
-
-                    // tracing::error!("{}", &self.config.save_folder.to_str().unwrap()); //log
-                    // tracing::error!("{}", &self.config.save_folder.to_str().unwrap()); //log
-                    // tracing::error!("{:?}", &self.config.save_format); //log
                 });
-  
         });
     }
 }
 
 impl App for KrustyGrab {
+    // Function called after every frame render of the app. Used to complete the save of the screenshot. 
     fn post_rendering(&mut self, _window_size_px: [u32; 2], frame: &eframe::Frame) {
+        // if we have requested a frame.screenshot
         if let Some(res) = frame.screenshot() {
+            // and if we have a save path (should be redundant)
             if let Some(path) = self.save_path_request.clone() { 
+                // save the image 
                 let save_region = &self.get_selected_area().unwrap_or_else(||Rect::from_min_size(pos2(0.0, 0.0), frame.info().window_info.size));
                 save_image(res.region(save_region, None), path).expect("Unable to save");
             }        
@@ -439,36 +421,43 @@ impl App for KrustyGrab {
         }
     }
     
+    // Function called at every render of the app 
     fn update(&mut self, ctx: &Context, frame: &mut eframe::Frame) {
+        
+        // If we are not saving we go back to not full screen 
         if self.save_path_request.is_none(){
             frame.set_fullscreen(false);
         }
         
+        // Setting dark or light mode 
         if self.config.dark_mode {
             ctx.set_visuals(Visuals::dark());
         } else {
             ctx.set_visuals(Visuals::light());
         }
 
+        // Render of the config panel. It has to close if I click an hotkey (to "select area") 
         if self.config_window && !self.is_window_status_crop(){
             self.render_config(ctx);
         }
 
         //Take the screenshot before turning on the visibility of the window
         if self.screenshot_requested {
-            self.screenshot_requested = false;
             self.set_screenshot(ctx);
             frame.set_visible(true);
+            self.screenshot_requested = false;
         }
 
+        // In base of the status it chooses what to display
         match self.window_status {
             WindowStatus::Main => self.main_window(ctx, frame),
             WindowStatus::Crop => self.crop_screen_window(ctx, frame),
             WindowStatus::Save => self.save_window(ctx, frame),
         }
     
-        //Handler for majour shortcuts
+        // When we are not setting a shortcut
         if !self.settingkey {
+            // Handler for shortcuts
             if let Some(hk) = ctx.input_mut(|x| {
                 for s in self.config.myhotkeys.iter().filter(|x|x.1.key.is_some()).clone() {
                     let sh = KeyboardShortcut::new(s.1.modifier, s.1.key.unwrap());
@@ -573,9 +562,5 @@ impl App for KrustyGrab {
                 }
             }
         }
-
-        // Performance debug -> frame generation time
-        // print!("\r{:?}      ", i.elapsed());
-        // std::io::stdout().flush();
     }
 }

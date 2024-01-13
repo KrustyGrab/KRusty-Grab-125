@@ -4,6 +4,7 @@ use egui_extras::RetainedImage;
 use crate::krustygrab::KrustyGrab;
 
 impl KrustyGrab {
+    ///Windows rendered before saving the screen
     pub fn save_window(&mut self, ctx: &Context, frame: &mut eframe::Frame){
         let window_size = frame.info().window_info.size;
         let mut painter = ctx.layer_painter(LayerId::background());
